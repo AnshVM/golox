@@ -23,6 +23,8 @@ func (scanner *Scanner) ScanTokens() []Token {
 		scanner.start = scanner.current
 		scanner.scanToken()
 	}
+	//start = current for case where the input ends with comment
+	scanner.start = scanner.current
 	scanner.addToken(EOF, nil)
 	return scanner.tokens
 }
@@ -81,9 +83,19 @@ func (scanner *Scanner) scanToken() {
 			for scanner.peek() != '\n' && !scanner.isAtEnd() {
 				scanner.advance()
 			}
+		} else if scanner.match('*') {
+			for !scanner.isAtEnd() {
+				if scanner.peek() == '*' && scanner.peekNext() == '/' {
+					scanner.advance()
+					scanner.advance()
+					break
+				}
+				scanner.advance()
+			}
 		} else {
 			scanner.addToken(SLASH, nil)
 		}
+		break
 	case '"':
 		scanner.string()
 		break
