@@ -15,8 +15,12 @@ import (
 func run(source string) {
 	scanner := Scanner.NewScanner(source)
 	tokens := scanner.ScanTokens()
-	for _, token := range tokens {
-		fmt.Println(token)
+
+	parser := Parser.NewParser(tokens)
+	expr := parser.Parse()
+
+	if expr != nil {
+		fmt.Println(expr.Print())
 	}
 }
 
@@ -43,41 +47,10 @@ func runPrompt() {
 	}
 }
 
-func PrintExpr() {
-	expr := Parser.Binary{
-		Operator: Scanner.NewToken(Scanner.MINUS, "-", nil, 1),
-		Left:     &Parser.Unary{Operator: Scanner.NewToken(Scanner.MINUS, "-", nil, 1), Right: &Parser.Literal{Value: 123}},
-		Right:    &Parser.Grouping{Expression: &Parser.Literal{Value: 45.67}},
-	}
-
-	expr2 := Parser.Binary{
-		Operator: Scanner.NewToken(Scanner.STAR, "*", nil, 1),
-		Left: &Parser.Grouping{
-			Expression: &Parser.Binary{
-				Operator: Scanner.NewToken(Scanner.PLUS, "+", nil, 1),
-				Right:    &Parser.Literal{Value: 1},
-				Left:     &Parser.Literal{Value: 2},
-			},
-		},
-		Right: &Parser.Grouping{
-			Expression: &Parser.Binary{
-				Operator: Scanner.NewToken(Scanner.MINUS, "-", nil, 1),
-				Right:    &Parser.Literal{Value: 4},
-				Left:     &Parser.Literal{Value: 3},
-			},
-		},
-	}
-	fmt.Println(expr.Print())
-	fmt.Println(expr.PrintRPN())
-	fmt.Println(expr2.PrintRPN())
-	fmt.Println(expr2.Print())
-}
-
 func main() {
-	// if len(os.Args) == 2 {
-	// 	runFile(os.Args[1])
-	// } else {
-	// 	runPrompt()
-	// }
-	PrintExpr()
+	if len(os.Args) == 2 {
+		runFile(os.Args[1])
+	} else {
+		runPrompt()
+	}
 }

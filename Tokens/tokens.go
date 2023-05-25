@@ -1,4 +1,4 @@
-package Scanner
+package Tokens
 
 import "fmt"
 
@@ -48,7 +48,7 @@ const (
 	EOF = "EOF"
 )
 
-var keywords = map[string]string{
+var Keywords = map[string]string{
 	"and":    AND,
 	"class":  CLASS,
 	"else":   ELSE,
@@ -74,8 +74,8 @@ type Token struct {
 	Line    uint
 }
 
-func NewToken(tokenType string, lexeme string, literal any, line uint) Token {
-	return Token{
+func NewToken(tokenType string, lexeme string, literal any, line uint) *Token {
+	return &Token{
 		Type:    tokenType,
 		Lexeme:  lexeme,
 		Literal: literal,

@@ -1,10 +1,10 @@
 package Parser
 
 import (
-	"github.com/AnshVM/golox/Scanner"
+	"github.com/AnshVM/golox/Tokens"
 )
 
-type Token = Scanner.Token
+type Token = Tokens.Token
 
 type Expr interface {
 	Print() string
@@ -13,7 +13,7 @@ type Expr interface {
 
 type Binary struct {
 	Left     Expr
-	Operator Token
+	Operator *Token
 	Right    Expr
 }
 
@@ -26,6 +26,6 @@ type Literal struct {
 }
 
 type Unary struct {
-	Operator Token
+	Operator *Token
 	Right    Expr
 }

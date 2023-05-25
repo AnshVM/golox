@@ -4,28 +4,29 @@ import (
 	"strconv"
 
 	"github.com/AnshVM/golox/Error"
+	"github.com/AnshVM/golox/Tokens"
 )
 
 type Scanner struct {
 	source  string
-	tokens  []Token
+	tokens  []*Tokens.Token
 	start   uint
 	current uint
 	line    uint
 }
 
 func NewScanner(source string) Scanner {
-	return Scanner{source: source, tokens: []Token{}}
+	return Scanner{source: source, tokens: []*Tokens.Token{}}
 }
 
-func (scanner *Scanner) ScanTokens() []Token {
+func (scanner *Scanner) ScanTokens() []*Tokens.Token {
 	for !scanner.isAtEnd() {
 		scanner.start = scanner.current
 		scanner.scanToken()
 	}
 	//start = current for case where the input ends with comment
 	scanner.start = scanner.current
-	scanner.addToken(EOF, nil)
+	scanner.addToken(Tokens.EOF, nil)
 	return scanner.tokens
 }
 
@@ -37,46 +38,46 @@ func (scanner *Scanner) scanToken() {
 	c := scanner.advance()
 	switch c {
 	case '(':
-		scanner.addToken(LEFT_PAREN, nil)
+		scanner.addToken(Tokens.LEFT_PAREN, nil)
 		break
 	case ')':
-		scanner.addToken(RIGHT_PAREN, nil)
+		scanner.addToken(Tokens.RIGHT_PAREN, nil)
 		break
 	case '{':
-		scanner.addToken(LEFT_BRACE, nil)
+		scanner.addToken(Tokens.LEFT_BRACE, nil)
 		break
 	case '}':
-		scanner.addToken(RIGHT_BRACE, nil)
+		scanner.addToken(Tokens.RIGHT_BRACE, nil)
 		break
 	case ',':
-		scanner.addToken(COMMA, nil)
+		scanner.addToken(Tokens.COMMA, nil)
 		break
 	case '.':
-		scanner.addToken(DOT, nil)
+		scanner.addToken(Tokens.DOT, nil)
 		break
 	case '-':
-		scanner.addToken(MINUS, nil)
+		scanner.addToken(Tokens.MINUS, nil)
 		break
 	case '+':
-		scanner.addToken(PLUS, nil)
+		scanner.addToken(Tokens.PLUS, nil)
 		break
 	case ';':
-		scanner.addToken(SEMICOLON, nil)
+		scanner.addToken(Tokens.SEMICOLON, nil)
 		break
 	case '*':
-		scanner.addToken(STAR, nil)
+		scanner.addToken(Tokens.STAR, nil)
 		break
 	case '!':
-		scanner.matchAddToken('=', BANG_EQUAL, BANG)
+		scanner.matchAddToken('=', Tokens.BANG_EQUAL, Tokens.BANG)
 		break
 	case '=':
-		scanner.matchAddToken('=', EQUAL_EQUAL, EQUAL)
+		scanner.matchAddToken('=', Tokens.EQUAL_EQUAL, Tokens.EQUAL)
 		break
 	case '>':
-		scanner.matchAddToken('=', GREATER_EQUAL, GREATER)
+		scanner.matchAddToken('=', Tokens.GREATER_EQUAL, Tokens.GREATER)
 		break
 	case '<':
-		scanner.matchAddToken('=', LESS_EQAUL, LESS)
+		scanner.matchAddToken('=', Tokens.LESS_EQAUL, Tokens.LESS)
 		break
 	case '/':
 		if scanner.match('/') {
@@ -93,7 +94,7 @@ func (scanner *Scanner) scanToken() {
 				scanner.advance()
 			}
 		} else {
-			scanner.addToken(SLASH, nil)
+			scanner.addToken(Tokens.SLASH, nil)
 		}
 		break
 	case '"':
@@ -119,7 +120,7 @@ func (scanner *Scanner) scanToken() {
 			break
 		}
 
-		Error.Error(scanner.line, "Unexpected character.")
+		Error.ReportScanError(scanner.line, "Unexpected character.")
 	}
 }
 
@@ -128,10 +129,10 @@ func (scanner *Scanner) identifier() {
 		scanner.advance()
 	}
 	text := scanner.source[scanner.start:scanner.current]
-	if keywords[text] == "" {
-		scanner.addToken(IDENTIFIER, nil)
+	if Tokens.Keywords[text] == "" {
+		scanner.addToken(Tokens.IDENTIFIER, nil)
 	} else {
-		scanner.addToken(keywords[text], nil)
+		scanner.addToken(Tokens.Keywords[text], nil)
 	}
 
 }
@@ -152,7 +153,7 @@ func (scanner *Scanner) number() {
 		}
 	}
 	value, _ := strconv.ParseFloat(scanner.source[scanner.start:scanner.current], 32)
-	scanner.addToken(NUMBER, value)
+	scanner.addToken(Tokens.NUMBER, value)
 }
 
 func (scanner *Scanner) peekNext() byte {
@@ -174,11 +175,11 @@ func (scanner *Scanner) string() {
 		scanner.advance()
 	}
 	if scanner.isAtEnd() {
-		Error.Error(scanner.line, "Unterminated string")
+		Error.ReportScanError(scanner.line, "Unterminated string")
 	}
 	scanner.advance()
 	value := scanner.source[scanner.start+1 : scanner.current-1]
-	scanner.addToken(STRING, value)
+	scanner.addToken(Tokens.STRING, value)
 }
 
 func (scanner *Scanner) peek() byte {
@@ -212,7 +213,7 @@ func (scanner *Scanner) addToken(tokenType string, literal any) {
 	lexeme := scanner.source[scanner.start:scanner.current]
 	scanner.tokens = append(
 		scanner.tokens,
-		Token{Type: tokenType, Lexeme: lexeme, Literal: literal, Line: scanner.line},
+		&Tokens.Token{Type: tokenType, Lexeme: lexeme, Literal: literal, Line: scanner.line},
 	)
 }
 
