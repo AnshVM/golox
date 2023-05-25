@@ -20,11 +20,26 @@ func NewParser(tokens []*Tokens.Token) *Parser {
 }
 
 func (p *Parser) Parse() Expr {
-	expr := p.expression()
+	expr := p.comma()
 	if p.parseError != nil {
 		p.parseError = nil
 		return nil
 	}
+	return expr
+}
+
+// Recursive decent parser
+// Lower precedence in taken first
+
+func (p *Parser) comma() Expr {
+	expr := p.expression()
+
+	for p.match(Tokens.COMMA) {
+		operator := p.previous()
+		right := p.expression()
+		expr = &Binary{Left: expr, Operator: operator, Right: right}
+	}
+
 	return expr
 }
 
@@ -110,6 +125,7 @@ func (p *Parser) primary() Expr {
 		return &Grouping{Expression: expr}
 	}
 	p.parseError = Error.ErrParseError
+	Error.ReportParseError(p.peek(), "Unexpected token")
 	return nil
 }
 
