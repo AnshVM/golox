@@ -18,6 +18,14 @@ func (literal *Literal) Print() string {
 	return fmt.Sprintf("%+v", literal.Value)
 }
 
+func (conditional *Conditional) Print() string {
+	return fmt.Sprintf("(condition (%s) then (%s) else (%s) )",
+		conditional.Condition.Print(),
+		conditional.Then.Print(),
+		conditional.Else.Print(),
+	)
+}
+
 func parenthesize(name string, exprs ...Expr) string {
 	str := "(" + name
 	for _, expr := range exprs {

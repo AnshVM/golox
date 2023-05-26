@@ -11,6 +11,12 @@ type Expr interface {
 	PrintRPN() string
 }
 
+type Conditional struct {
+	Condition Expr
+	Then      Expr
+	Else      Expr
+}
+
 type Binary struct {
 	Left     Expr
 	Operator *Token

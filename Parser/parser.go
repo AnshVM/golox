@@ -1,6 +1,8 @@
 package Parser
 
 import (
+	"fmt"
+
 	"github.com/AnshVM/golox/Error"
 	"github.com/AnshVM/golox/Tokens"
 )
@@ -20,7 +22,7 @@ func NewParser(tokens []*Tokens.Token) *Parser {
 }
 
 func (p *Parser) Parse() Expr {
-	expr := p.comma()
+	expr := p.expression()
 	if p.parseError != nil {
 		p.parseError = nil
 		return nil
@@ -31,23 +33,48 @@ func (p *Parser) Parse() Expr {
 // Recursive decent parser
 // Lower precedence in taken first
 
+func (p *Parser) expression() Expr {
+	return p.comma()
+}
+
 func (p *Parser) comma() Expr {
-	expr := p.expression()
+
+	if p.match(Tokens.COMMA) {
+		p.missingExpressionBefore(",")
+	}
+
+	expr := p.ternary()
 
 	for p.match(Tokens.COMMA) {
 		operator := p.previous()
-		right := p.expression()
+		right := p.ternary()
 		expr = &Binary{Left: expr, Operator: operator, Right: right}
 	}
 
 	return expr
 }
 
-func (p *Parser) expression() Expr {
-	return p.equality()
+func (p *Parser) ternary() Expr {
+	expr := p.equality()
+
+	if p.match(Tokens.QUESTION_MARK) {
+		thenExpr := p.expression()
+		p.consume(Tokens.COLON, "Expected ':' when using ternary operator '?'")
+		elseExpr := p.expression()
+		expr = &Conditional{Condition: expr, Then: thenExpr, Else: elseExpr}
+	}
+	return expr
 }
 
 func (p *Parser) equality() Expr {
+
+	if p.match(Tokens.EQUAL_EQUAL) {
+		p.missingExpressionBefore("==")
+	}
+
+	if p.match(Tokens.BANG_EQUAL) {
+		p.missingExpressionBefore("!=")
+	}
 	expr := p.comparision()
 
 	for p.match(Tokens.EQUAL_EQUAL, Tokens.BANG_EQUAL) {
@@ -59,6 +86,24 @@ func (p *Parser) equality() Expr {
 }
 
 func (p *Parser) comparision() Expr {
+
+	switch true {
+	case p.match(Tokens.GREATER):
+		p.missingExpressionBefore(">")
+		break
+	case p.match(Tokens.GREATER_EQUAL):
+		p.missingExpressionBefore(">=")
+		break
+	case p.match(Tokens.LESS):
+		p.missingExpressionBefore("<")
+		break
+	case p.match(Tokens.LESS_EQAUL):
+		p.missingExpressionBefore("<=")
+		break
+	default:
+		break
+	}
+
 	expr := p.term()
 
 	for p.match(Tokens.GREATER, Tokens.GREATER_EQUAL, Tokens.LESS, Tokens.LESS_EQAUL) {
@@ -70,6 +115,18 @@ func (p *Parser) comparision() Expr {
 }
 
 func (p *Parser) term() Expr {
+
+	switch true {
+	case p.match(Tokens.MINUS):
+		p.missingExpressionBefore("-")
+		break
+	case p.match(Tokens.PLUS):
+		p.missingExpressionBefore("+")
+		break
+	default:
+		break
+	}
+
 	expr := p.factor()
 
 	for p.match(Tokens.MINUS, Tokens.PLUS) {
@@ -82,6 +139,16 @@ func (p *Parser) term() Expr {
 }
 
 func (p *Parser) factor() Expr {
+	switch true {
+	case p.match(Tokens.SLASH):
+		p.missingExpressionBefore("/")
+		break
+	case p.match(Tokens.STAR):
+		p.missingExpressionBefore("*")
+		break
+	default:
+		break
+	}
 	expr := p.unary()
 
 	for p.match(Tokens.SLASH, Tokens.STAR) {
@@ -195,4 +262,9 @@ func (p *Parser) isAtEnd() bool {
 
 func (p *Parser) peek() *Token {
 	return p.tokens[p.current]
+}
+
+func (p *Parser) missingExpressionBefore(operator string) {
+	Error.ReportParseError(p.previous(), fmt.Sprintf("Missing expression before '%s'", operator))
+	p.parseError = Error.ErrParseError
 }

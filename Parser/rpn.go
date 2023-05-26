@@ -22,4 +22,12 @@ func (grouping *Grouping) PrintRPN() string {
 	return grouping.Expression.PrintRPN()
 }
 
+func (conditional *Conditional) PrintRPN() string {
+	return fmt.Sprintf("%s condition %s then %s else",
+		conditional.Condition.PrintRPN(),
+		conditional.Then.PrintRPN(),
+		conditional.Else.PrintRPN(),
+	)
+}
+
 //  -1 + 2 -> 1- 2 +

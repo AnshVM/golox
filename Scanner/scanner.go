@@ -67,6 +67,12 @@ func (scanner *Scanner) scanToken() {
 	case '*':
 		scanner.addToken(Tokens.STAR, nil)
 		break
+	case '?':
+		scanner.addToken(Tokens.QUESTION_MARK, nil)
+		break
+	case ':':
+		scanner.addToken(Tokens.COLON, nil)
+		break
 	case '!':
 		scanner.matchAddToken('=', Tokens.BANG_EQUAL, Tokens.BANG)
 		break

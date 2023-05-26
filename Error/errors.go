@@ -9,7 +9,7 @@ import (
 var HadError = false
 
 func Report(line uint, where string, message string) {
-	fmt.Println("[line " + fmt.Sprint(line) + "] Error" + where + ": " + message)
+	fmt.Println("[line " + fmt.Sprint(line) + "] Error " + where + ": " + message)
 	HadError = true
 }
 
