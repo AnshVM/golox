@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"github.com/AnshVM/golox/Error"
+	"github.com/AnshVM/golox/Interpreter"
 	"github.com/AnshVM/golox/Parser"
 	"github.com/AnshVM/golox/Scanner"
 )
@@ -18,10 +19,10 @@ func run(source string) {
 
 	parser := Parser.NewParser(tokens)
 	expr := parser.Parse()
-
-	if expr != nil {
-		fmt.Println(expr.Print())
+	if Error.HadError || Error.HadRuntimeError {
+		return
 	}
+	Interpreter.Interpret(expr)
 }
 
 func runFile(path string) error {
@@ -32,6 +33,9 @@ func runFile(path string) error {
 	run(string(data))
 	if Error.HadError {
 		os.Exit(65)
+	}
+	if Error.HadRuntimeError {
+		os.Exit(70)
 	}
 	return nil
 }
@@ -44,6 +48,7 @@ func runPrompt() {
 		line = line[:len(line)-1]
 		run(line)
 		Error.HadError = false
+		Error.HadRuntimeError = false
 	}
 }
 

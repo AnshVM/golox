@@ -219,6 +219,7 @@ func (p *Parser) synchronize() {
 	}
 }
 
+// Similar to `check()`, but accepts a list of token types
 func (p *Parser) match(tokenTypes ...string) bool {
 	for _, tokenType := range tokenTypes {
 		if p.check(tokenType) {
@@ -229,6 +230,7 @@ func (p *Parser) match(tokenTypes ...string) bool {
 	return false
 }
 
+// Consumes the current token and returns it
 func (p *Parser) advance() *Token {
 	if !p.isAtEnd() {
 		p.current++
@@ -240,6 +242,7 @@ func (p *Parser) previous() *Token {
 	return p.tokens[p.current-1]
 }
 
+// similar to `consume()`, but throws an error with `message`
 func (p *Parser) consume(tokenType string, message string) {
 	if p.check(tokenType) {
 		p.advance()
@@ -249,6 +252,7 @@ func (p *Parser) consume(tokenType string, message string) {
 	p.parseError = Error.ErrParseError
 }
 
+// checks the type of the current token, consumes the token if types match
 func (p *Parser) check(tokenType string) bool {
 	if p.isAtEnd() {
 		return false
@@ -260,6 +264,7 @@ func (p *Parser) isAtEnd() bool {
 	return p.peek().Type == Tokens.EOF
 }
 
+// returns currrent token without consuming it
 func (p *Parser) peek() *Token {
 	return p.tokens[p.current]
 }

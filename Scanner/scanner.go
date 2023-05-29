@@ -1,6 +1,7 @@
 package Scanner
 
 import (
+	"fmt"
 	"strconv"
 
 	"github.com/AnshVM/golox/Error"
@@ -126,7 +127,7 @@ func (scanner *Scanner) scanToken() {
 			break
 		}
 
-		Error.ReportScanError(scanner.line, "Unexpected character.")
+		Error.ReportScanError(scanner.line, fmt.Sprintf("Unexpected token: %c", c))
 	}
 }
 
@@ -152,6 +153,9 @@ func isAlphaNumeirc(c byte) bool {
 }
 
 func (scanner *Scanner) number() {
+	if scanner.peek() == '.' && isDigit(scanner.peekNext()) {
+		scanner.advance()
+	}
 	for isDigit(scanner.peek()) {
 		scanner.advance()
 		if scanner.peek() == '.' && isDigit(scanner.peekNext()) {
@@ -159,7 +163,7 @@ func (scanner *Scanner) number() {
 		}
 	}
 	value, _ := strconv.ParseFloat(scanner.source[scanner.start:scanner.current], 32)
-	scanner.addToken(Tokens.NUMBER, value)
+	scanner.addToken(Tokens.NUMBER, float32(value))
 }
 
 func (scanner *Scanner) peekNext() byte {
