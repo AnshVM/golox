@@ -8,7 +8,8 @@ import (
 )
 
 type Environment struct {
-	Values map[string]any
+	Values    map[string]any
+	Enclosing *Environment
 }
 
 func (env *Environment) Define(name *Tokens.Token, value any) {
@@ -18,14 +19,19 @@ func (env *Environment) Define(name *Tokens.Token, value any) {
 func (env *Environment) Get(name *Tokens.Token) any {
 	if val, ok := env.Values[name.Lexeme]; ok {
 		return val
+	} else if env.Enclosing != nil {
+		return env.Enclosing.Get(name)
 	}
 	Error.ReportRuntimeError(name, fmt.Sprintf("Undefined variable %s", name.Lexeme))
 	return nil
+
 }
 
 func (env *Environment) Assign(name *Tokens.Token, value any) {
 	if _, ok := env.Values[name.Lexeme]; ok {
 		env.Values[name.Lexeme] = value
+	} else if env.Enclosing != nil {
+		env.Enclosing.Assign(name, value)
 	} else {
 		Error.ReportRuntimeError(name, fmt.Sprintf("Undefined variable %s", name.Lexeme))
 	}

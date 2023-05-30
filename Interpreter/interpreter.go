@@ -32,6 +32,8 @@ func (i *Interpreter) Exec(stmt Parser.Stmt) error {
 		return i.ExecPrintStmt(&s)
 	case Parser.Var:
 		return i.ExecVarStmt(&s)
+	case Parser.Block:
+		return i.ExecBlockStmt(&s)
 	}
 	return nil
 }
@@ -59,6 +61,26 @@ func (i *Interpreter) ExecVarStmt(stmt *Parser.Var) error {
 	}
 	i.Env.Define(stmt.Name, nil)
 	return nil
+}
+
+func (i *Interpreter) ExecBlockStmt(stmt *Parser.Block) error {
+	var executeBlock = func(statements []Parser.Stmt, env *Environment.Environment) error {
+		prev := i.Env
+		defer func() {
+			i.Env = prev
+		}()
+		i.Env = env
+		var err error
+		for _, stmt := range statements {
+			err = i.Exec(stmt)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	err := executeBlock(stmt.Statements, &Environment.Environment{Enclosing: i.Env, Values: map[string]any{}})
+	return err
 }
 
 func (i *Interpreter) Eval(expr Parser.Expr) (any, error) {

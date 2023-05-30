@@ -83,3 +83,9 @@ type Var struct {
 }
 
 func (expr Var) stmt() {}
+
+type Block struct {
+	Statements []Stmt
+}
+
+func (b Block) stmt() {}
