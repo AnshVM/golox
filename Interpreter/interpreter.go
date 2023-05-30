@@ -4,48 +4,106 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/AnshVM/golox/Environment"
 	"github.com/AnshVM/golox/Error"
 	"github.com/AnshVM/golox/Parser"
 	"github.com/AnshVM/golox/Tokens"
 )
 
-func Interpret(expr Parser.Expr) {
-	result, err := Eval(expr)
+type Interpreter struct {
+	Env *Environment.Environment
+}
+
+func (i *Interpreter) Interpret(stmts []Parser.Stmt) error {
+	for _, stmt := range stmts {
+		err := i.Exec(stmt)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (i *Interpreter) Exec(stmt Parser.Stmt) error {
+	switch s := stmt.(type) {
+	case Parser.Expression:
+		return i.ExecExpressionStmt(&s)
+	case Parser.Print:
+		return i.ExecPrintStmt(&s)
+	case Parser.Var:
+		return i.ExecVarStmt(&s)
+	}
+	return nil
+}
+
+func (i *Interpreter) ExecExpressionStmt(stmt *Parser.Expression) error {
+	_, err := i.Eval(stmt.Expression)
+	return err
+}
+
+func (i *Interpreter) ExecPrintStmt(stmt *Parser.Print) error {
+	result, err := i.Eval(stmt.Expression)
 	if err == nil {
 		fmt.Printf("%v\n", result)
 	}
+	return err
 }
 
-func Eval(expr Parser.Expr) (any, error) {
+func (i *Interpreter) ExecVarStmt(stmt *Parser.Var) error {
+	if stmt.Initializer != nil {
+		value, err := i.Eval(stmt.Initializer)
+		if err == nil {
+			i.Env.Define(stmt.Name, value)
+		}
+		return err
+	}
+	i.Env.Define(stmt.Name, nil)
+	return nil
+}
+
+func (i *Interpreter) Eval(expr Parser.Expr) (any, error) {
 	switch e := expr.(type) {
 	case *Parser.Literal:
-		return EvalLiteral(e), nil
+		return i.EvalLiteral(e), nil
 	case *Parser.Binary:
-		return EvalBinary(e)
+		return i.EvalBinary(e)
 	case *Parser.Grouping:
-		return EvalGrouping(e)
+		return i.EvalGrouping(e)
 	case *Parser.Unary:
-		return EvalUnary(e)
+		return i.EvalUnary(e)
 	case *Parser.Conditional:
-		return EvalConditional(e)
+		return i.EvalConditional(e)
+	case *Parser.Variable:
+		return i.EvalVariable(e), nil
+	case *Parser.Assign:
+		return i.EvalAssign(e)
 	}
 	return nil, Error.ErrRuntimeError
 }
 
-func EvalLiteral(expr *Parser.Literal) any {
+func (i *Interpreter) EvalAssign(expr *Parser.Assign) (any, error) {
+	value, err := i.Eval(expr.Value)
+	if err != nil {
+		return nil, err
+	}
+	i.Env.Assign(expr.Name, value)
+	return value, nil
+}
+
+func (i *Interpreter) EvalLiteral(expr *Parser.Literal) any {
 	return expr.Value
 }
 
-func EvalGrouping(expr *Parser.Grouping) (any, error) {
-	evaluated, err := Eval(expr.Expression)
+func (i *Interpreter) EvalGrouping(expr *Parser.Grouping) (any, error) {
+	evaluated, err := i.Eval(expr.Expression)
 	if err != nil {
 		return nil, err
 	}
 	return evaluated, nil
 }
 
-func EvalUnary(expr *Parser.Unary) (any, error) {
-	right, err := Eval(expr.Right)
+func (i *Interpreter) EvalUnary(expr *Parser.Unary) (any, error) {
+	right, err := i.Eval(expr.Right)
 	if err != nil {
 		return nil, err
 	}
@@ -64,29 +122,33 @@ func EvalUnary(expr *Parser.Unary) (any, error) {
 	return nil, Error.ErrRuntimeError
 }
 
-func EvalConditional(conditional *Parser.Conditional) (any, error) {
-	cond, err := Eval(conditional.Condition)
+func (i *Interpreter) EvalVariable(expr *Parser.Variable) any {
+	return i.Env.Get(expr.Name)
+}
+
+func (i *Interpreter) EvalConditional(conditional *Parser.Conditional) (any, error) {
+	cond, err := i.Eval(conditional.Condition)
 	if err != nil {
 		return nil, Error.ErrRuntimeError
 	}
 	if cond == true {
-		return Eval(conditional.Then)
+		return i.Eval(conditional.Then)
 	} else {
-		return Eval(conditional.Else)
+		return i.Eval(conditional.Else)
 	}
 }
 
-func EvalBinary(binary *Parser.Binary) (any, error) {
+func (i *Interpreter) EvalBinary(binary *Parser.Binary) (any, error) {
 	switch binary.Operator.Type {
 	case Tokens.MINUS:
-		left, right, err := EvalBinaryOperandsNumber(binary)
+		left, right, err := i.EvalBinaryOperandsNumber(binary)
 		if err != nil {
 			return nil, err
 		}
 		return (left - right), nil
 
 	case Tokens.SLASH:
-		left, right, err := EvalBinaryOperandsNumber(binary)
+		left, right, err := i.EvalBinaryOperandsNumber(binary)
 		if err != nil {
 			return nil, err
 		}
@@ -97,14 +159,14 @@ func EvalBinary(binary *Parser.Binary) (any, error) {
 		return (left / right), nil
 
 	case Tokens.STAR:
-		left, right, err := EvalBinaryOperandsNumber(binary)
+		left, right, err := i.EvalBinaryOperandsNumber(binary)
 		if err != nil {
 			return nil, err
 		}
 		return (left * right), nil
 
 	case Tokens.PLUS:
-		left, right, err := EvalBinaryOperandsAny(binary)
+		left, right, err := i.EvalBinaryOperandsAny(binary)
 		if err != nil {
 			return nil, err
 		}
@@ -126,42 +188,42 @@ func EvalBinary(binary *Parser.Binary) (any, error) {
 		return nil, Error.ErrRuntimeError
 
 	case Tokens.GREATER:
-		left, right, err := EvalBinaryOperandsNumber(binary)
+		left, right, err := i.EvalBinaryOperandsNumber(binary)
 		if err != nil {
 			return nil, err
 		}
 		return (left > right), nil
 
 	case Tokens.GREATER_EQUAL:
-		left, right, err := EvalBinaryOperandsNumber(binary)
+		left, right, err := i.EvalBinaryOperandsNumber(binary)
 		if err != nil {
 			return nil, err
 		}
 		return (left >= right), nil
 
 	case Tokens.LESS:
-		left, right, err := EvalBinaryOperandsNumber(binary)
+		left, right, err := i.EvalBinaryOperandsNumber(binary)
 		if err != nil {
 			return nil, err
 		}
 		return (left < right), nil
 
 	case Tokens.LESS_EQAUL:
-		left, right, err := EvalBinaryOperandsNumber(binary)
+		left, right, err := i.EvalBinaryOperandsNumber(binary)
 		if err != nil {
 			return nil, err
 		}
 		return (left <= right), nil
 
 	case Tokens.EQUAL_EQUAL:
-		left, right, err := EvalBinaryOperandsAny(binary)
+		left, right, err := i.EvalBinaryOperandsAny(binary)
 		if err != nil {
 			return nil, err
 		}
 		return isEqual(left, right), nil
 
 	case Tokens.BANG_EQUAL:
-		left, right, err := EvalBinaryOperandsAny(binary)
+		left, right, err := i.EvalBinaryOperandsAny(binary)
 		if err != nil {
 			return nil, err
 		}
@@ -172,24 +234,24 @@ func EvalBinary(binary *Parser.Binary) (any, error) {
 	return nil, nil
 }
 
-func EvalBinaryOperandsAny(binary *Parser.Binary) (any, any, error) {
-	right, err := Eval(binary.Right)
+func (i *Interpreter) EvalBinaryOperandsAny(binary *Parser.Binary) (any, any, error) {
+	right, err := i.Eval(binary.Right)
 	if err != nil {
 		return nil, nil, err
 	}
-	left, err := Eval(binary.Left)
+	left, err := i.Eval(binary.Left)
 	if err != nil {
 		return nil, nil, err
 	}
 	return left, right, nil
 }
 
-func EvalBinaryOperandsNumber(binary *Parser.Binary) (float32, float32, error) {
-	evalRight, err := Eval(binary.Right)
+func (i *Interpreter) EvalBinaryOperandsNumber(binary *Parser.Binary) (float32, float32, error) {
+	evalRight, err := i.Eval(binary.Right)
 	if err != nil {
 		return 0, 0, err
 	}
-	evalLeft, err := Eval(binary.Left)
+	evalLeft, err := i.Eval(binary.Left)
 	if err != nil {
 		return 0, 0, err
 	}

@@ -7,30 +7,31 @@ import (
 	"io/ioutil"
 	"os"
 
+	"github.com/AnshVM/golox/Environment"
 	"github.com/AnshVM/golox/Error"
 	"github.com/AnshVM/golox/Interpreter"
 	"github.com/AnshVM/golox/Parser"
 	"github.com/AnshVM/golox/Scanner"
 )
 
-func run(source string) {
+func run(i *Interpreter.Interpreter, source string) {
 	scanner := Scanner.NewScanner(source)
 	tokens := scanner.ScanTokens()
 
 	parser := Parser.NewParser(tokens)
-	expr := parser.Parse()
+	stmts := parser.Parse()
 	if Error.HadError || Error.HadRuntimeError {
 		return
 	}
-	Interpreter.Interpret(expr)
+	i.Interpret(stmts)
 }
 
-func runFile(path string) error {
+func runFile(i *Interpreter.Interpreter, path string) error {
 	data, err := ioutil.ReadFile(path)
 	if err != nil {
 		return errors.New(Error.CANNOT_READ_FILE)
 	}
-	run(string(data))
+	run(i, string(data))
 	if Error.HadError {
 		os.Exit(65)
 	}
@@ -40,22 +41,24 @@ func runFile(path string) error {
 	return nil
 }
 
-func runPrompt() {
+func runPrompt(i *Interpreter.Interpreter) {
 	reader := bufio.NewReader(os.Stdin)
 	for {
 		fmt.Print("> ")
 		line, _ := reader.ReadString('\n')
 		line = line[:len(line)-1]
-		run(line)
+		run(i, line)
 		Error.HadError = false
 		Error.HadRuntimeError = false
 	}
 }
 
 func main() {
+	env := Environment.Environment{Values: make(map[string]any)}
+	interpreter := &Interpreter.Interpreter{Env: &env}
 	if len(os.Args) == 2 {
-		runFile(os.Args[1])
+		runFile(interpreter, os.Args[1])
 	} else {
-		runPrompt()
+		runPrompt(interpreter)
 	}
 }

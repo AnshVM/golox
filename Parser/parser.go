@@ -21,38 +21,90 @@ func NewParser(tokens []*Tokens.Token) *Parser {
 	}
 }
 
-func (p *Parser) Parse() Expr {
-	expr := p.expression()
+func (p *Parser) Parse() []Stmt {
+	statements := []Stmt{}
+	for !p.isAtEnd() {
+		statements = append(statements, p.declaration())
+	}
 	if p.parseError != nil {
 		p.parseError = nil
 		return nil
 	}
-	return expr
+	return statements
 }
 
 // Recursive decent parser
 // Lower precedence in taken first
 
-func (p *Parser) expression() Expr {
-	return p.comma()
+func (p *Parser) declaration() Stmt {
+	defer func() {
+		if p.parseError != nil {
+			p.parseError = nil
+			p.synchronize()
+		}
+	}()
+	if p.match(Tokens.VAR) {
+		varName := p.consume(Tokens.IDENTIFIER, "Expected variable name")
+		if varName == nil {
+			return nil
+		}
+		if p.match(Tokens.EQUAL) {
+			expr := p.expression()
+			p.consume(Tokens.SEMICOLON, "Expect ';' after declaration")
+			return Var{Name: varName, Initializer: expr}
+		}
+		p.consume(Tokens.SEMICOLON, "Expect ';' after declaration")
+		return Var{Name: varName, Initializer: nil}
+	}
+	return p.statement()
 }
 
-func (p *Parser) comma() Expr {
-
-	if p.match(Tokens.COMMA) {
-		p.missingExpressionBefore(",")
+func (p *Parser) statement() Stmt {
+	if p.match(Tokens.PRINT) {
+		expr := p.expression()
+		p.consume(Tokens.SEMICOLON, "Expect ';' after expression")
+		return Print{Expression: expr}
+	} else {
+		expr := p.expression()
+		p.consume(Tokens.SEMICOLON, "Expect ';' after expression")
+		return Expression{Expression: expr}
 	}
+}
 
+func (p *Parser) expression() Expr {
+	return p.assignment()
+}
+
+// assignment -> IDENTIFIER "=" assignment | equality
+func (p *Parser) assignment() Expr {
 	expr := p.ternary()
-
-	for p.match(Tokens.COMMA) {
-		operator := p.previous()
-		right := p.ternary()
-		expr = &Binary{Left: expr, Operator: operator, Right: right}
+	if p.match(Tokens.EQUAL) {
+		equals := p.previous()
+		value := p.assignment()
+		if varExpr, ok := expr.(*Variable); ok {
+			return &Assign{Name: varExpr.Name, Value: value}
+		}
+		Error.ReportParseError(equals, "Invalid assignment target")
 	}
-
 	return expr
 }
+
+// func (p *Parser) comma() Expr {
+
+// 	if p.match(Tokens.COMMA) {
+// 		p.missingExpressionBefore(",")
+// 	}
+
+// 	expr := p.ternary()
+
+// 	for p.match(Tokens.COMMA) {
+// 		operator := p.previous()
+// 		right := p.ternary()
+// 		expr = &Binary{Left: expr, Operator: operator, Right: right}
+// 	}
+
+// 	return expr
+// }
 
 func (p *Parser) ternary() Expr {
 	expr := p.equality()
@@ -186,6 +238,10 @@ func (p *Parser) primary() Expr {
 		return &Literal{Value: nil}
 	}
 
+	if p.match(Tokens.IDENTIFIER) {
+		return &Variable{Name: p.previous()}
+	}
+
 	if p.match(Tokens.LEFT_PAREN) {
 		expr := p.expression()
 		p.consume(Tokens.RIGHT_PAREN, "Expect ')' after expression")
@@ -242,14 +298,15 @@ func (p *Parser) previous() *Token {
 	return p.tokens[p.current-1]
 }
 
-// similar to `consume()`, but throws an error with `message`
-func (p *Parser) consume(tokenType string, message string) {
+// similar to `check()`, but throws an error with `message`
+func (p *Parser) consume(tokenType string, message string) *Tokens.Token {
 	if p.check(tokenType) {
 		p.advance()
-		return
+		return p.previous()
 	}
 	Error.ReportParseError(p.peek(), message)
 	p.parseError = Error.ErrParseError
+	return nil
 }
 
 // checks the type of the current token, consumes the token if types match

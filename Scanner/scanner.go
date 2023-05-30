@@ -126,7 +126,6 @@ func (scanner *Scanner) scanToken() {
 			scanner.identifier()
 			break
 		}
-
 		Error.ReportScanError(scanner.line, fmt.Sprintf("Unexpected token: %c", c))
 	}
 }
@@ -186,6 +185,7 @@ func (scanner *Scanner) string() {
 	}
 	if scanner.isAtEnd() {
 		Error.ReportScanError(scanner.line, "Unterminated string")
+		return
 	}
 	scanner.advance()
 	value := scanner.source[scanner.start+1 : scanner.current-1]
