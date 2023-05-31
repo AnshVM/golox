@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/AnshVM/golox/Ast"
 	"github.com/AnshVM/golox/Environment"
 	"github.com/AnshVM/golox/Error"
 	"github.com/AnshVM/golox/Parser"
@@ -26,24 +27,24 @@ func (i *Interpreter) Interpret(stmts []Parser.Stmt) error {
 
 func (i *Interpreter) Exec(stmt Parser.Stmt) error {
 	switch s := stmt.(type) {
-	case Parser.Expression:
+	case Ast.ExpressionStmt:
 		return i.ExecExpressionStmt(&s)
-	case Parser.Print:
+	case Ast.PrintStmt:
 		return i.ExecPrintStmt(&s)
-	case Parser.Var:
+	case Ast.VarStmt:
 		return i.ExecVarStmt(&s)
-	case Parser.Block:
+	case Ast.BlockStmt:
 		return i.ExecBlockStmt(&s)
 	}
 	return nil
 }
 
-func (i *Interpreter) ExecExpressionStmt(stmt *Parser.Expression) error {
+func (i *Interpreter) ExecExpressionStmt(stmt *Ast.ExpressionStmt) error {
 	_, err := i.Eval(stmt.Expression)
 	return err
 }
 
-func (i *Interpreter) ExecPrintStmt(stmt *Parser.Print) error {
+func (i *Interpreter) ExecPrintStmt(stmt *Ast.PrintStmt) error {
 	result, err := i.Eval(stmt.Expression)
 	if err == nil {
 		fmt.Printf("%v\n", result)
@@ -51,7 +52,7 @@ func (i *Interpreter) ExecPrintStmt(stmt *Parser.Print) error {
 	return err
 }
 
-func (i *Interpreter) ExecVarStmt(stmt *Parser.Var) error {
+func (i *Interpreter) ExecVarStmt(stmt *Ast.VarStmt) error {
 	if stmt.Initializer != nil {
 		value, err := i.Eval(stmt.Initializer)
 		if err == nil {
@@ -63,7 +64,7 @@ func (i *Interpreter) ExecVarStmt(stmt *Parser.Var) error {
 	return nil
 }
 
-func (i *Interpreter) ExecBlockStmt(stmt *Parser.Block) error {
+func (i *Interpreter) ExecBlockStmt(stmt *Ast.BlockStmt) error {
 	var executeBlock = func(statements []Parser.Stmt, env *Environment.Environment) error {
 		prev := i.Env
 		defer func() {
@@ -85,25 +86,25 @@ func (i *Interpreter) ExecBlockStmt(stmt *Parser.Block) error {
 
 func (i *Interpreter) Eval(expr Parser.Expr) (any, error) {
 	switch e := expr.(type) {
-	case *Parser.Literal:
+	case *Ast.LiteralExpr:
 		return i.EvalLiteral(e), nil
-	case *Parser.Binary:
+	case *Ast.BinaryExpr:
 		return i.EvalBinary(e)
-	case *Parser.Grouping:
+	case *Ast.GroupingExpr:
 		return i.EvalGrouping(e)
-	case *Parser.Unary:
+	case *Ast.UnaryExpr:
 		return i.EvalUnary(e)
-	case *Parser.Conditional:
+	case *Ast.ConditionalExpr:
 		return i.EvalConditional(e)
-	case *Parser.Variable:
+	case *Ast.VariableExpr:
 		return i.EvalVariable(e), nil
-	case *Parser.Assign:
+	case *Ast.AssignExpr:
 		return i.EvalAssign(e)
 	}
 	return nil, Error.ErrRuntimeError
 }
 
-func (i *Interpreter) EvalAssign(expr *Parser.Assign) (any, error) {
+func (i *Interpreter) EvalAssign(expr *Ast.AssignExpr) (any, error) {
 	value, err := i.Eval(expr.Value)
 	if err != nil {
 		return nil, err
@@ -112,11 +113,11 @@ func (i *Interpreter) EvalAssign(expr *Parser.Assign) (any, error) {
 	return value, nil
 }
 
-func (i *Interpreter) EvalLiteral(expr *Parser.Literal) any {
+func (i *Interpreter) EvalLiteral(expr *Ast.LiteralExpr) any {
 	return expr.Value
 }
 
-func (i *Interpreter) EvalGrouping(expr *Parser.Grouping) (any, error) {
+func (i *Interpreter) EvalGrouping(expr *Ast.GroupingExpr) (any, error) {
 	evaluated, err := i.Eval(expr.Expression)
 	if err != nil {
 		return nil, err
@@ -124,7 +125,7 @@ func (i *Interpreter) EvalGrouping(expr *Parser.Grouping) (any, error) {
 	return evaluated, nil
 }
 
-func (i *Interpreter) EvalUnary(expr *Parser.Unary) (any, error) {
+func (i *Interpreter) EvalUnary(expr *Ast.UnaryExpr) (any, error) {
 	right, err := i.Eval(expr.Right)
 	if err != nil {
 		return nil, err
@@ -144,11 +145,11 @@ func (i *Interpreter) EvalUnary(expr *Parser.Unary) (any, error) {
 	return nil, Error.ErrRuntimeError
 }
 
-func (i *Interpreter) EvalVariable(expr *Parser.Variable) any {
+func (i *Interpreter) EvalVariable(expr *Ast.VariableExpr) any {
 	return i.Env.Get(expr.Name)
 }
 
-func (i *Interpreter) EvalConditional(conditional *Parser.Conditional) (any, error) {
+func (i *Interpreter) EvalConditional(conditional *Ast.ConditionalExpr) (any, error) {
 	cond, err := i.Eval(conditional.Condition)
 	if err != nil {
 		return nil, Error.ErrRuntimeError
@@ -160,7 +161,7 @@ func (i *Interpreter) EvalConditional(conditional *Parser.Conditional) (any, err
 	}
 }
 
-func (i *Interpreter) EvalBinary(binary *Parser.Binary) (any, error) {
+func (i *Interpreter) EvalBinary(binary *Ast.BinaryExpr) (any, error) {
 	switch binary.Operator.Type {
 	case Tokens.MINUS:
 		left, right, err := i.EvalBinaryOperandsNumber(binary)
@@ -256,7 +257,7 @@ func (i *Interpreter) EvalBinary(binary *Parser.Binary) (any, error) {
 	return nil, nil
 }
 
-func (i *Interpreter) EvalBinaryOperandsAny(binary *Parser.Binary) (any, any, error) {
+func (i *Interpreter) EvalBinaryOperandsAny(binary *Ast.BinaryExpr) (any, any, error) {
 	right, err := i.Eval(binary.Right)
 	if err != nil {
 		return nil, nil, err
@@ -268,7 +269,7 @@ func (i *Interpreter) EvalBinaryOperandsAny(binary *Parser.Binary) (any, any, er
 	return left, right, nil
 }
 
-func (i *Interpreter) EvalBinaryOperandsNumber(binary *Parser.Binary) (float32, float32, error) {
+func (i *Interpreter) EvalBinaryOperandsNumber(binary *Ast.BinaryExpr) (float32, float32, error) {
 	evalRight, err := i.Eval(binary.Right)
 	if err != nil {
 		return 0, 0, err

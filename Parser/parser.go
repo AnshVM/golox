@@ -3,9 +3,14 @@ package Parser
 import (
 	"fmt"
 
+	"github.com/AnshVM/golox/Ast"
 	"github.com/AnshVM/golox/Error"
 	"github.com/AnshVM/golox/Tokens"
 )
+
+type Token = Tokens.Token
+type Stmt = Ast.Stmt
+type Expr = Ast.Expr
 
 type Parser struct {
 	tokens     []*Token
@@ -51,10 +56,10 @@ func (p *Parser) declaration() Stmt {
 		if p.match(Tokens.EQUAL) {
 			expr := p.expression()
 			p.consume(Tokens.SEMICOLON, "Expect ';' after declaration")
-			return Var{Name: varName, Initializer: expr}
+			return Ast.VarStmt{Name: varName, Initializer: expr}
 		}
 		p.consume(Tokens.SEMICOLON, "Expect ';' after declaration")
-		return Var{Name: varName, Initializer: nil}
+		return Ast.VarStmt{Name: varName, Initializer: nil}
 	}
 	return p.statement()
 }
@@ -63,18 +68,18 @@ func (p *Parser) statement() Stmt {
 	if p.match(Tokens.PRINT) {
 		expr := p.expression()
 		p.consume(Tokens.SEMICOLON, "Expect ';' after expression")
-		return Print{Expression: expr}
+		return Ast.PrintStmt{Expression: expr}
 	} else if p.match(Tokens.LEFT_BRACE) {
 		statements := []Stmt{}
 		for !p.check(Tokens.RIGHT_BRACE) && !p.isAtEnd() {
 			statements = append(statements, p.declaration())
 		}
 		p.consume(Tokens.RIGHT_BRACE, "Expect '}' after block.")
-		return Block{Statements: statements}
+		return Ast.BlockStmt{Statements: statements}
 	} else {
 		expr := p.expression()
 		p.consume(Tokens.SEMICOLON, "Expect ';' after expression")
-		return Expression{Expression: expr}
+		return Ast.ExpressionStmt{Expression: expr}
 	}
 }
 
@@ -88,8 +93,8 @@ func (p *Parser) assignment() Expr {
 	if p.match(Tokens.EQUAL) {
 		equals := p.previous()
 		value := p.assignment()
-		if varExpr, ok := expr.(*Variable); ok {
-			return &Assign{Name: varExpr.Name, Value: value}
+		if varExpr, ok := expr.(*Ast.VariableExpr); ok {
+			return &Ast.AssignExpr{Name: varExpr.Name, Value: value}
 		}
 		Error.ReportParseError(equals, "Invalid assignment target")
 	}
@@ -120,7 +125,7 @@ func (p *Parser) ternary() Expr {
 		thenExpr := p.expression()
 		p.consume(Tokens.COLON, "Expected ':' when using ternary operator '?'")
 		elseExpr := p.expression()
-		expr = &Conditional{Condition: expr, Then: thenExpr, Else: elseExpr}
+		expr = &Ast.ConditionalExpr{Condition: expr, Then: thenExpr, Else: elseExpr}
 	}
 	return expr
 }
@@ -139,7 +144,7 @@ func (p *Parser) equality() Expr {
 	for p.match(Tokens.EQUAL_EQUAL, Tokens.BANG_EQUAL) {
 		operator := p.previous()
 		right := p.comparision()
-		expr = &Binary{Left: expr, Operator: operator, Right: right}
+		expr = &Ast.BinaryExpr{Left: expr, Operator: operator, Right: right}
 	}
 	return expr
 }
@@ -168,7 +173,7 @@ func (p *Parser) comparision() Expr {
 	for p.match(Tokens.GREATER, Tokens.GREATER_EQUAL, Tokens.LESS, Tokens.LESS_EQAUL) {
 		operator := p.previous()
 		right := p.term()
-		expr = &Binary{Left: expr, Operator: operator, Right: right}
+		expr = &Ast.BinaryExpr{Left: expr, Operator: operator, Right: right}
 	}
 	return expr
 }
@@ -191,7 +196,7 @@ func (p *Parser) term() Expr {
 	for p.match(Tokens.MINUS, Tokens.PLUS) {
 		operator := p.previous()
 		right := p.factor()
-		expr = &Binary{Left: expr, Operator: operator, Right: right}
+		expr = &Ast.BinaryExpr{Left: expr, Operator: operator, Right: right}
 	}
 
 	return expr
@@ -213,7 +218,7 @@ func (p *Parser) factor() Expr {
 	for p.match(Tokens.SLASH, Tokens.STAR) {
 		operator := p.previous()
 		right := p.unary()
-		expr = &Binary{Left: expr, Operator: operator, Right: right}
+		expr = &Ast.BinaryExpr{Left: expr, Operator: operator, Right: right}
 	}
 
 	return expr
@@ -224,7 +229,7 @@ func (p *Parser) unary() Expr {
 	for p.match(Tokens.MINUS, Tokens.BANG) {
 		prefix := p.previous()
 		right := p.unary()
-		expr = &Unary{Operator: prefix, Right: right}
+		expr = &Ast.UnaryExpr{Operator: prefix, Right: right}
 		return expr
 	}
 	return p.primary()
@@ -232,27 +237,27 @@ func (p *Parser) unary() Expr {
 
 func (p *Parser) primary() Expr {
 	if p.match(Tokens.NUMBER, Tokens.STRING) {
-		return &Literal{Value: p.previous().Literal}
+		return &Ast.LiteralExpr{Value: p.previous().Literal}
 	}
 
 	if p.match(Tokens.TRUE) {
-		return &Literal{Value: true}
+		return &Ast.LiteralExpr{Value: true}
 	}
 	if p.match(Tokens.FALSE) {
-		return &Literal{Value: false}
+		return &Ast.LiteralExpr{Value: false}
 	}
 	if p.match(Tokens.NIL) {
-		return &Literal{Value: nil}
+		return &Ast.LiteralExpr{Value: nil}
 	}
 
 	if p.match(Tokens.IDENTIFIER) {
-		return &Variable{Name: p.previous()}
+		return &Ast.VariableExpr{Name: p.previous()}
 	}
 
 	if p.match(Tokens.LEFT_PAREN) {
 		expr := p.expression()
 		p.consume(Tokens.RIGHT_PAREN, "Expect ')' after expression")
-		return &Grouping{Expression: expr}
+		return &Ast.GroupingExpr{Expression: expr}
 	}
 	p.parseError = Error.ErrParseError
 	Error.ReportParseError(p.peek(), "Unexpected token")
