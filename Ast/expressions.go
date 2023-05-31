@@ -57,3 +57,11 @@ type AssignExpr struct {
 }
 
 func (a *AssignExpr) isExpr() {}
+
+type LogicalExpr struct {
+	Left     Expr
+	Operator *Tokens.Token
+	Right    Expr
+}
+
+func (l *LogicalExpr) isExpr() {}

@@ -30,3 +30,18 @@ type BlockStmt struct {
 }
 
 func (b BlockStmt) stmt() {}
+
+type IfStmt struct {
+	Condition  Expr
+	ThenBranch Stmt
+	ElseBranch Stmt
+}
+
+func (ifs IfStmt) stmt() {}
+
+type WhileStmt struct {
+	Condition Expr
+	Body      Stmt
+}
+
+func (while WhileStmt) stmt() {}

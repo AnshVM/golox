@@ -35,6 +35,37 @@ func (i *Interpreter) Exec(stmt Parser.Stmt) error {
 		return i.ExecVarStmt(&s)
 	case Ast.BlockStmt:
 		return i.ExecBlockStmt(&s)
+	case Ast.IfStmt:
+		return i.ExecIfStmt(&s)
+	case *Ast.WhileStmt:
+		return i.ExecWhileStmt(s)
+	}
+	return nil
+}
+
+func (i *Interpreter) ExecWhileStmt(stmt *Ast.WhileStmt) error {
+	for {
+		condition, err := i.Eval(stmt.Condition)
+		if err != nil {
+			return err
+		}
+		if isTruthy(condition) {
+			err := i.Exec(stmt.Body)
+			if err != nil {
+				return err
+			}
+		} else {
+			break
+		}
+	}
+	return nil
+}
+
+func (i *Interpreter) ExecIfStmt(stmt *Ast.IfStmt) error {
+	if isTruthy(stmt.Condition) {
+		return i.Exec(stmt.ThenBranch)
+	} else if stmt.ElseBranch != nil {
+		return i.Exec(stmt.ElseBranch)
 	}
 	return nil
 }
@@ -97,11 +128,32 @@ func (i *Interpreter) Eval(expr Parser.Expr) (any, error) {
 	case *Ast.ConditionalExpr:
 		return i.EvalConditional(e)
 	case *Ast.VariableExpr:
-		return i.EvalVariable(e), nil
+		return i.EvalVariable(e)
 	case *Ast.AssignExpr:
 		return i.EvalAssign(e)
+	case *Ast.LogicalExpr:
+		return i.EvalLogical(e)
 	}
 	return nil, Error.ErrRuntimeError
+}
+
+func (i *Interpreter) EvalLogical(expr *Ast.LogicalExpr) (any, error) {
+	left, err := i.Eval(expr.Left)
+	if err != nil {
+		return nil, err
+	}
+
+	if expr.Operator.Type == Tokens.OR {
+		if isTruthy(left) {
+			return left, nil
+		}
+	} else {
+		if !isTruthy(left) {
+			return left, nil
+		}
+	}
+	return i.Eval(expr.Right)
+
 }
 
 func (i *Interpreter) EvalAssign(expr *Ast.AssignExpr) (any, error) {
@@ -109,7 +161,10 @@ func (i *Interpreter) EvalAssign(expr *Ast.AssignExpr) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	i.Env.Assign(expr.Name, value)
+	err = i.Env.Assign(expr.Name, value)
+	if err != nil {
+		return nil, err
+	}
 	return value, nil
 }
 
@@ -145,7 +200,7 @@ func (i *Interpreter) EvalUnary(expr *Ast.UnaryExpr) (any, error) {
 	return nil, Error.ErrRuntimeError
 }
 
-func (i *Interpreter) EvalVariable(expr *Ast.VariableExpr) any {
+func (i *Interpreter) EvalVariable(expr *Ast.VariableExpr) (any, error) {
 	return i.Env.Get(expr.Name)
 }
 

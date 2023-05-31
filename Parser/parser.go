@@ -65,22 +65,102 @@ func (p *Parser) declaration() Stmt {
 }
 
 func (p *Parser) statement() Stmt {
-	if p.match(Tokens.PRINT) {
-		expr := p.expression()
-		p.consume(Tokens.SEMICOLON, "Expect ';' after expression")
-		return Ast.PrintStmt{Expression: expr}
-	} else if p.match(Tokens.LEFT_BRACE) {
-		statements := []Stmt{}
-		for !p.check(Tokens.RIGHT_BRACE) && !p.isAtEnd() {
-			statements = append(statements, p.declaration())
-		}
-		p.consume(Tokens.RIGHT_BRACE, "Expect '}' after block.")
-		return Ast.BlockStmt{Statements: statements}
-	} else {
-		expr := p.expression()
-		p.consume(Tokens.SEMICOLON, "Expect ';' after expression")
-		return Ast.ExpressionStmt{Expression: expr}
+	switch true {
+	case p.match(Tokens.PRINT):
+		return p.print()
+	case p.match(Tokens.LEFT_BRACE):
+		return p.block()
+	case p.match(Tokens.IF):
+		return p.ifStmt()
+	case p.match(Tokens.WHILE):
+		return p.WhileStmt()
+	case p.match(Tokens.FOR):
+		return p.ForStmt()
+	default:
+		return p.expressionStmt()
 	}
+}
+
+// desugarises to While loop
+func (p *Parser) ForStmt() Stmt {
+	p.consume(Tokens.LEFT_PAREN, "Expect '(' after 'for'.")
+
+	var initializer Stmt
+	if p.match(Tokens.SEMICOLON) {
+		initializer = nil
+	} else if p.peek().Type == Tokens.VAR {
+		initializer = p.declaration()
+	} else {
+		initializer = p.expressionStmt()
+	}
+	var condition Expr
+	if !p.check(Tokens.SEMICOLON) {
+		condition = p.expression()
+	}
+	p.consume(Tokens.SEMICOLON, "Expect ';' after loop condition")
+
+	var increment Expr
+	if !p.check(Tokens.RIGHT_PAREN) {
+		increment = p.expression()
+	}
+	p.consume(Tokens.RIGHT_PAREN, "Expect ')' after for clauses")
+	incrementStmt := Ast.ExpressionStmt{Expression: increment}
+
+	body := p.statement()
+
+	if increment != nil {
+		body = Ast.BlockStmt{Statements: []Stmt{body, incrementStmt}}
+	}
+	if condition == nil {
+		condition = Ast.LiteralExpr{Value: true}
+	}
+	body = &Ast.WhileStmt{Condition: condition, Body: body}
+	if initializer != nil {
+		body = Ast.BlockStmt{Statements: []Stmt{initializer, body}}
+	}
+	return body
+}
+
+func (p *Parser) WhileStmt() Stmt {
+	p.consume(Tokens.LEFT_PAREN, "Expect '(' after 'while'.")
+	expr := p.expression()
+	p.consume(Tokens.RIGHT_PAREN, "Expect ')' after expression")
+	body := p.statement()
+	return &Ast.WhileStmt{Condition: expr, Body: body}
+}
+
+func (p *Parser) ifStmt() Stmt {
+	p.consume(Tokens.LEFT_PAREN, "Expect '(' after 'if'.")
+	condition := p.expression()
+	p.consume(Tokens.RIGHT_PAREN, "Expect ')' after expression.")
+
+	thenBranch := p.statement()
+	var elseBranch Stmt = nil
+	if p.match(Tokens.ELSE) {
+		elseBranch = p.statement()
+	}
+	return Ast.IfStmt{Condition: condition, ThenBranch: thenBranch, ElseBranch: elseBranch}
+}
+
+func (p *Parser) print() Stmt {
+	expr := p.expression()
+	p.consume(Tokens.SEMICOLON, "Expect ';' after expression")
+	return Ast.PrintStmt{Expression: expr}
+}
+
+func (p *Parser) block() Stmt {
+	statements := []Stmt{}
+	for !p.check(Tokens.RIGHT_BRACE) && !p.isAtEnd() {
+		statements = append(statements, p.declaration())
+	}
+	p.consume(Tokens.RIGHT_BRACE, "Expect '}' after block.")
+	return Ast.BlockStmt{Statements: statements}
+}
+
+func (p *Parser) expressionStmt() Stmt {
+	expr := p.expression()
+	p.consume(Tokens.SEMICOLON, "Expect ';' after expression")
+	return Ast.ExpressionStmt{Expression: expr}
 }
 
 func (p *Parser) expression() Expr {
@@ -89,7 +169,7 @@ func (p *Parser) expression() Expr {
 
 // assignment -> IDENTIFIER "=" assignment | equality
 func (p *Parser) assignment() Expr {
-	expr := p.ternary()
+	expr := p.logic_or()
 	if p.match(Tokens.EQUAL) {
 		equals := p.previous()
 		value := p.assignment()
@@ -101,31 +181,22 @@ func (p *Parser) assignment() Expr {
 	return expr
 }
 
-// func (p *Parser) comma() Expr {
+func (p *Parser) logic_or() Expr {
+	expr := p.logic_and()
+	for p.match(Tokens.OR) {
+		operator := p.previous()
+		right := p.logic_and()
+		expr = &Ast.LogicalExpr{Left: expr, Operator: operator, Right: right}
+	}
+	return expr
+}
 
-// 	if p.match(Tokens.COMMA) {
-// 		p.missingExpressionBefore(",")
-// 	}
-
-// 	expr := p.ternary()
-
-// 	for p.match(Tokens.COMMA) {
-// 		operator := p.previous()
-// 		right := p.ternary()
-// 		expr = &Binary{Left: expr, Operator: operator, Right: right}
-// 	}
-
-// 	return expr
-// }
-
-func (p *Parser) ternary() Expr {
+func (p *Parser) logic_and() Expr {
 	expr := p.equality()
-
-	if p.match(Tokens.QUESTION_MARK) {
-		thenExpr := p.expression()
-		p.consume(Tokens.COLON, "Expected ':' when using ternary operator '?'")
-		elseExpr := p.expression()
-		expr = &Ast.ConditionalExpr{Condition: expr, Then: thenExpr, Else: elseExpr}
+	for p.match(Tokens.AND) {
+		operator := p.previous()
+		right := p.equality()
+		expr = &Ast.LogicalExpr{Left: expr, Operator: operator, Right: right}
 	}
 	return expr
 }
