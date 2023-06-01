@@ -48,20 +48,61 @@ func (p *Parser) declaration() Stmt {
 			p.synchronize()
 		}
 	}()
-	if p.match(Tokens.VAR) {
-		varName := p.consume(Tokens.IDENTIFIER, "Expected variable name")
-		if varName == nil {
-			return nil
-		}
-		if p.match(Tokens.EQUAL) {
-			expr := p.expression()
-			p.consume(Tokens.SEMICOLON, "Expect ';' after declaration")
-			return Ast.VarStmt{Name: varName, Initializer: expr}
-		}
-		p.consume(Tokens.SEMICOLON, "Expect ';' after declaration")
-		return Ast.VarStmt{Name: varName, Initializer: nil}
+	switch true {
+	case p.match(Tokens.VAR):
+		return p.varDecl()
+	case p.match(Tokens.FUN):
+		return p.funcDecl()
+	default:
+		return p.statement()
 	}
-	return p.statement()
+}
+
+func (p *Parser) funcDecl() Stmt {
+	return p.function("function")
+}
+
+func (p *Parser) function(kind string) Stmt {
+	name := p.consume(Tokens.IDENTIFIER, fmt.Sprintf("Expect %s name", kind))
+	paren := p.consume(Tokens.LEFT_PAREN, fmt.Sprintf("Expect '(' after %s name", kind))
+	var paramList []*Tokens.Token
+	if p.peek().Type != Tokens.RIGHT_PAREN {
+		paramList = p.params()
+	}
+	if len(paramList) >= 255 {
+		Error.ReportParseError(paren, "Can't have more than 255 arguments")
+		p.parseError = Error.ErrParseError
+	}
+	p.consume(Tokens.RIGHT_PAREN, fmt.Sprintf("Expect ')' after %s declaration", kind))
+	p.consume(Tokens.LEFT_BRACE, fmt.Sprintf("Expect '{' before %s body", kind))
+	stmts := p.block()
+	return &Ast.Function{Name: name, Params: paramList, Body: stmts}
+}
+
+func (p *Parser) params() []*Tokens.Token {
+	paramList := []*Tokens.Token{}
+	for {
+		param := p.consume(Tokens.IDENTIFIER, "Expect parameter name.")
+		paramList = append(paramList, param)
+		if !p.match(Tokens.COMMA) {
+			break
+		}
+	}
+	return paramList
+}
+
+func (p *Parser) varDecl() Stmt {
+	varName := p.consume(Tokens.IDENTIFIER, "Expected variable name")
+	if varName == nil {
+		return nil
+	}
+	if p.match(Tokens.EQUAL) {
+		expr := p.expression()
+		p.consume(Tokens.SEMICOLON, "Expect ';' after declaration")
+		return Ast.VarStmt{Name: varName, Initializer: expr}
+	}
+	p.consume(Tokens.SEMICOLON, "Expect ';' after declaration")
+	return Ast.VarStmt{Name: varName, Initializer: nil}
 }
 
 func (p *Parser) statement() Stmt {
@@ -69,16 +110,28 @@ func (p *Parser) statement() Stmt {
 	case p.match(Tokens.PRINT):
 		return p.print()
 	case p.match(Tokens.LEFT_BRACE):
-		return p.block()
+		return Ast.BlockStmt{Statements: p.block()}
 	case p.match(Tokens.IF):
 		return p.ifStmt()
 	case p.match(Tokens.WHILE):
 		return p.WhileStmt()
 	case p.match(Tokens.FOR):
 		return p.ForStmt()
+	case p.match(Tokens.RETURN):
+		return p.ReturnStmt()
 	default:
 		return p.expressionStmt()
 	}
+}
+
+func (p *Parser) ReturnStmt() Stmt {
+	keyword := p.previous()
+	if p.match(Tokens.SEMICOLON) {
+		return Ast.Return{Keyword: keyword, Value: nil}
+	}
+	expr := p.expression()
+	p.consume(Tokens.SEMICOLON, "Expect ';' after return.")
+	return &Ast.Return{Keyword: keyword, Value: expr}
 }
 
 // desugarises to While loop
@@ -148,13 +201,13 @@ func (p *Parser) print() Stmt {
 	return Ast.PrintStmt{Expression: expr}
 }
 
-func (p *Parser) block() Stmt {
+func (p *Parser) block() []Stmt {
 	statements := []Stmt{}
 	for !p.check(Tokens.RIGHT_BRACE) && !p.isAtEnd() {
 		statements = append(statements, p.declaration())
 	}
 	p.consume(Tokens.RIGHT_BRACE, "Expect '}' after block.")
-	return Ast.BlockStmt{Statements: statements}
+	return statements
 }
 
 func (p *Parser) expressionStmt() Stmt {
@@ -322,7 +375,7 @@ func (p *Parser) call() Expr {
 				break
 			}
 		}
-		p.consume(Tokens.LEFT_PAREN, "Expect ')' for function call.")
+		p.consume(Tokens.RIGHT_PAREN, "Expect ')' for function call.")
 
 		if len(args) >= 255 {
 			Error.ReportParseError(p.peek(), "Can't have more that 255 arguments")

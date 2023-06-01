@@ -2,7 +2,6 @@ package Interpreter
 
 import (
 	"fmt"
-	"strconv"
 
 	"github.com/AnshVM/golox/Ast"
 	"github.com/AnshVM/golox/Environment"
@@ -44,7 +43,24 @@ func (i *Interpreter) Exec(stmt Parser.Stmt) error {
 		return i.ExecIfStmt(&s)
 	case *Ast.WhileStmt:
 		return i.ExecWhileStmt(s)
+	case *Ast.Function:
+		return i.ExecFuncStmt(s)
 	}
+	return nil
+}
+
+func (i *Interpreter) ExecReturnStmt(stmt *Ast.Return) (any, error) {
+	var returnVal any = nil
+	var err error
+	if stmt.Value != nil {
+		returnVal, err = i.Eval(stmt.Value)
+	}
+	return returnVal, err
+}
+
+func (i *Interpreter) ExecFuncStmt(stmt *Ast.Function) error {
+	callable := CreateFunction(stmt)
+	i.Env.Define(stmt.Name.Lexeme, callable)
 	return nil
 }
 
@@ -67,7 +83,11 @@ func (i *Interpreter) ExecWhileStmt(stmt *Ast.WhileStmt) error {
 }
 
 func (i *Interpreter) ExecIfStmt(stmt *Ast.IfStmt) error {
-	if isTruthy(stmt.Condition) {
+	condition, err := i.Eval(stmt.Condition)
+	if err != nil {
+		return err
+	}
+	if isTruthy(condition) {
 		return i.Exec(stmt.ThenBranch)
 	} else if stmt.ElseBranch != nil {
 		return i.Exec(stmt.ElseBranch)
@@ -101,23 +121,29 @@ func (i *Interpreter) ExecVarStmt(stmt *Ast.VarStmt) error {
 }
 
 func (i *Interpreter) ExecBlockStmt(stmt *Ast.BlockStmt) error {
-	var executeBlock = func(statements []Parser.Stmt, env *Environment.Environment) error {
-		prev := i.Env
-		defer func() {
-			i.Env = prev
-		}()
-		i.Env = env
-		var err error
-		for _, stmt := range statements {
-			err = i.Exec(stmt)
-			if err != nil {
-				return err
-			}
-		}
-		return nil
-	}
-	err := executeBlock(stmt.Statements, &Environment.Environment{Enclosing: i.Env, Values: map[string]any{}})
+	_, err := i.executeBlock(stmt.Statements, &Environment.Environment{Enclosing: i.Env, Values: map[string]any{}})
 	return err
+}
+
+func (i *Interpreter) executeBlock(statements []Parser.Stmt, env *Environment.Environment) (any, error) {
+	prev := i.Env
+	defer func() {
+		i.Env = prev
+	}()
+	i.Env = env
+	var err error
+	for _, stmt := range statements {
+
+		if stmt, ok := stmt.(*Ast.Return); ok {
+			return i.ExecReturnStmt(stmt)
+		}
+
+		err = i.Exec(stmt)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return nil, nil
 }
 
 func (i *Interpreter) Eval(expr Parser.Expr) (any, error) {
@@ -168,7 +194,7 @@ func (i *Interpreter) EvalCall(expr *Ast.Call) (any, error) {
 		Error.ReportRuntimeError(expr.Paren, fmt.Sprintf("Expected %d arguments, got %d", function.Arity(), len(evaluatedArgs)))
 		return nil, Error.ErrRuntimeError
 	}
-	return function.Call(i, evaluatedArgs), nil
+	return function.Call(i, evaluatedArgs)
 }
 
 func (i *Interpreter) EvalLogical(expr *Ast.LogicalExpr) (any, error) {
@@ -288,10 +314,10 @@ func (i *Interpreter) EvalBinary(binary *Ast.BinaryExpr) (any, error) {
 		if isString(right) && isString(left) {
 			return (left.(string) + right.(string)), nil
 		}
-		if isString(right) && isFloat32(left) {
-			val, _ := left.(float32)
-			return (strconv.FormatFloat(float64(val), 'f', 0, 32) + right.(string)), nil
-		}
+		// if isString(right) && isFloat32(left) {
+		// 	val, _ := left.(float32)
+		// 	return (strconv.FormatFloat(float64(val), 'f', 0, 32) + right.(string)), nil
+		// }
 		// if isString(left) && isFloat32(right) {
 		// 	val, _ := right.(float32)
 		// 	return (left.(string) + strconv.FormatFloat(float64(val), 'f', 0, 32)), nil
