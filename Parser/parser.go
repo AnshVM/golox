@@ -303,7 +303,33 @@ func (p *Parser) unary() Expr {
 		expr = &Ast.UnaryExpr{Operator: prefix, Right: right}
 		return expr
 	}
-	return p.primary()
+	return p.call()
+}
+
+func (p *Parser) call() Expr {
+	expr := p.primary()
+	for p.match(Tokens.LEFT_PAREN) {
+		token := p.previous()
+		if p.match(Tokens.RIGHT_PAREN) { //no args
+			expr = &Ast.Call{Callee: expr, Arguments: []Expr{}, Paren: token}
+			continue
+		}
+		args := []Expr{}
+		for {
+			arg := p.expression()
+			args = append(args, arg)
+			if !p.match(Tokens.COMMA) {
+				break
+			}
+		}
+		p.consume(Tokens.LEFT_PAREN, "Expect ')' for function call.")
+
+		if len(args) >= 255 {
+			Error.ReportParseError(p.peek(), "Can't have more that 255 arguments")
+		}
+		expr = &Ast.Call{Callee: expr, Arguments: args, Paren: token}
+	}
+	return expr
 }
 
 func (p *Parser) primary() Expr {

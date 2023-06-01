@@ -15,6 +15,11 @@ type Interpreter struct {
 	Env *Environment.Environment
 }
 
+func NewInterpreter(env *Environment.Environment) *Interpreter {
+	env.Define("clock", Clock())
+	return &Interpreter{Env: env}
+}
+
 func (i *Interpreter) Interpret(stmts []Parser.Stmt) error {
 	for _, stmt := range stmts {
 		err := i.Exec(stmt)
@@ -87,11 +92,11 @@ func (i *Interpreter) ExecVarStmt(stmt *Ast.VarStmt) error {
 	if stmt.Initializer != nil {
 		value, err := i.Eval(stmt.Initializer)
 		if err == nil {
-			i.Env.Define(stmt.Name, value)
+			i.Env.Define(stmt.Name.Lexeme, value)
 		}
 		return err
 	}
-	i.Env.Define(stmt.Name, nil)
+	i.Env.Define(stmt.Name.Lexeme, nil)
 	return nil
 }
 
@@ -133,8 +138,37 @@ func (i *Interpreter) Eval(expr Parser.Expr) (any, error) {
 		return i.EvalAssign(e)
 	case *Ast.LogicalExpr:
 		return i.EvalLogical(e)
+	case *Ast.Call:
+		return i.EvalCall(e)
 	}
 	return nil, Error.ErrRuntimeError
+}
+
+func (i *Interpreter) EvalCall(expr *Ast.Call) (any, error) {
+
+	callee, err := i.Eval(expr.Callee)
+	if err != nil {
+		return nil, err
+	}
+
+	evaluatedArgs := []any{}
+	for _, argExpr := range expr.Arguments {
+		evalArg, err := i.Eval(argExpr)
+		if err != nil {
+			return nil, err
+		}
+		evaluatedArgs = append(evaluatedArgs, evalArg)
+	}
+	function, ok := callee.(*LoxCallable)
+	if !ok {
+		Error.ReportRuntimeError(expr.Paren, "Expression is not callable.")
+		return nil, Error.ErrRuntimeError
+	}
+	if len(evaluatedArgs) != int(function.Arity()) {
+		Error.ReportRuntimeError(expr.Paren, fmt.Sprintf("Expected %d arguments, got %d", function.Arity(), len(evaluatedArgs)))
+		return nil, Error.ErrRuntimeError
+	}
+	return function.Call(i, evaluatedArgs), nil
 }
 
 func (i *Interpreter) EvalLogical(expr *Ast.LogicalExpr) (any, error) {

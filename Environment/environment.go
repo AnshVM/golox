@@ -12,8 +12,8 @@ type Environment struct {
 	Enclosing *Environment
 }
 
-func (env *Environment) Define(name *Tokens.Token, value any) {
-	env.Values[name.Lexeme] = value
+func (env *Environment) Define(name string, value any) {
+	env.Values[name] = value
 }
 
 func (env *Environment) Get(name *Tokens.Token) (any, error) {

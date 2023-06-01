@@ -65,3 +65,11 @@ type LogicalExpr struct {
 }
 
 func (l *LogicalExpr) isExpr() {}
+
+type Call struct {
+	Callee    Expr
+	Paren     *Tokens.Token
+	Arguments []Expr
+}
+
+func (c *Call) isExpr() {}

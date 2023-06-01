@@ -54,8 +54,8 @@ func runPrompt(i *Interpreter.Interpreter) {
 }
 
 func main() {
-	env := Environment.Environment{Values: make(map[string]any)}
-	interpreter := &Interpreter.Interpreter{Env: &env}
+	globals := Environment.Environment{Values: make(map[string]any)}
+	interpreter := Interpreter.NewInterpreter(&globals)
 	if len(os.Args) == 2 {
 		runFile(interpreter, os.Args[1])
 	} else {
