@@ -66,7 +66,7 @@ func (i *Interpreter) ExecReturnStmt(stmt *Ast.Return) error {
 }
 
 func (i *Interpreter) ExecFuncStmt(stmt *Ast.Function) error {
-	callable := CreateFunction(stmt)
+	callable := CreateFunction(stmt, i.Env)
 	i.Env.Define(stmt.Name.Lexeme, callable)
 	return nil
 }

@@ -6,12 +6,12 @@ import (
 	"github.com/AnshVM/golox/Error"
 )
 
-func CreateFunction(declaration *Ast.Function) *LoxCallable {
+func CreateFunction(declaration *Ast.Function, closure *Environment.Environment) *LoxCallable {
 	Arity := func() uint {
 		return uint(len(declaration.Params))
 	}
 	Call := func(interpreter *Interpreter, arguments []any) (any, error) {
-		env := Environment.Environment{Values: map[string]any{}, Enclosing: interpreter.Env}
+		env := Environment.Environment{Values: map[string]any{}, Enclosing: closure}
 		for index, param := range declaration.Params {
 			env.Define(param.Lexeme, arguments[index])
 		}

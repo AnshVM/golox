@@ -10,7 +10,7 @@ var HadError = false
 var HadRuntimeError = false
 
 func PrintError(line uint, where string, message string) {
-	fmt.Println("[line " + fmt.Sprint(line) + "] Error " + where + ": " + message)
+	fmt.Println("[line " + fmt.Sprint(line+1) + "] Error " + where + ": " + message)
 }
 
 func Report(line uint, where string, message string) {
