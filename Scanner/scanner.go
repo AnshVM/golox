@@ -144,7 +144,7 @@ func (scanner *Scanner) identifier() {
 }
 
 func isAlpha(c byte) bool {
-	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'B') || c == '_'
+	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_'
 }
 
 func isAlphaNumeirc(c byte) bool {
