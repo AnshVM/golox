@@ -11,7 +11,8 @@ import (
 )
 
 type Interpreter struct {
-	Env *Environment.Environment
+	Env         *Environment.Environment
+	ReturnValue any //ugly hack to catch the return value in the Call, evaluated in the ExecReturnStmt func
 }
 
 func NewInterpreter(env *Environment.Environment) *Interpreter {
@@ -45,17 +46,23 @@ func (i *Interpreter) Exec(stmt Parser.Stmt) error {
 		return i.ExecWhileStmt(s)
 	case *Ast.Function:
 		return i.ExecFuncStmt(s)
+	case *Ast.Return:
+		return i.ExecReturnStmt(s)
 	}
 	return nil
 }
 
-func (i *Interpreter) ExecReturnStmt(stmt *Ast.Return) (any, error) {
+func (i *Interpreter) ExecReturnStmt(stmt *Ast.Return) error {
 	var returnVal any = nil
 	var err error
 	if stmt.Value != nil {
 		returnVal, err = i.Eval(stmt.Value)
+		if err == nil {
+			err = Error.ErrReturn
+		}
 	}
-	return returnVal, err
+	i.ReturnValue = returnVal
+	return err
 }
 
 func (i *Interpreter) ExecFuncStmt(stmt *Ast.Function) error {
@@ -121,11 +128,11 @@ func (i *Interpreter) ExecVarStmt(stmt *Ast.VarStmt) error {
 }
 
 func (i *Interpreter) ExecBlockStmt(stmt *Ast.BlockStmt) error {
-	_, err := i.executeBlock(stmt.Statements, &Environment.Environment{Enclosing: i.Env, Values: map[string]any{}})
+	err := i.executeBlock(stmt.Statements, &Environment.Environment{Enclosing: i.Env, Values: map[string]any{}})
 	return err
 }
 
-func (i *Interpreter) executeBlock(statements []Parser.Stmt, env *Environment.Environment) (any, error) {
+func (i *Interpreter) executeBlock(statements []Parser.Stmt, env *Environment.Environment) error {
 	prev := i.Env
 	defer func() {
 		i.Env = prev
@@ -133,17 +140,12 @@ func (i *Interpreter) executeBlock(statements []Parser.Stmt, env *Environment.En
 	i.Env = env
 	var err error
 	for _, stmt := range statements {
-
-		if stmt, ok := stmt.(*Ast.Return); ok {
-			return i.ExecReturnStmt(stmt)
-		}
-
 		err = i.Exec(stmt)
 		if err != nil {
-			return nil, err
+			break
 		}
 	}
-	return nil, nil
+	return err
 }
 
 func (i *Interpreter) Eval(expr Parser.Expr) (any, error) {

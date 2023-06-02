@@ -3,6 +3,7 @@ package Interpreter
 import (
 	"github.com/AnshVM/golox/Ast"
 	"github.com/AnshVM/golox/Environment"
+	"github.com/AnshVM/golox/Error"
 )
 
 func CreateFunction(declaration *Ast.Function) *LoxCallable {
@@ -14,7 +15,11 @@ func CreateFunction(declaration *Ast.Function) *LoxCallable {
 		for index, param := range declaration.Params {
 			env.Define(param.Lexeme, arguments[index])
 		}
-		return interpreter.executeBlock(declaration.Body, &env)
+		err := interpreter.executeBlock(declaration.Body, &env)
+		if err == Error.ErrReturn {
+			return interpreter.ReturnValue, nil
+		}
+		return nil, err
 	}
 	return &LoxCallable{Arity: Arity, Call: Call}
 }
