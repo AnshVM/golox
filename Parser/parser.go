@@ -59,12 +59,18 @@ func (p *Parser) declaration() Stmt {
 }
 
 func (p *Parser) funcDecl() Stmt {
-	return p.function("function")
+	return p.function()
 }
 
-func (p *Parser) function(kind string) Stmt {
-	name := p.consume(Tokens.IDENTIFIER, fmt.Sprintf("Expect %s name", kind))
-	paren := p.consume(Tokens.LEFT_PAREN, fmt.Sprintf("Expect '(' after %s name", kind))
+func (p *Parser) function() Stmt {
+	if p.check(Tokens.IDENTIFIER) {
+		return p.namedFunction(p.advance(), "function")
+	} else {
+		return p.expressionStmt()
+	}
+}
+
+func (p *Parser) paramList(paren *Tokens.Token, kind string) []*Tokens.Token {
 	var paramList []*Tokens.Token
 	if p.peek().Type != Tokens.RIGHT_PAREN {
 		paramList = p.params()
@@ -74,9 +80,23 @@ func (p *Parser) function(kind string) Stmt {
 		p.parseError = Error.ErrParseError
 	}
 	p.consume(Tokens.RIGHT_PAREN, fmt.Sprintf("Expect ')' after %s declaration", kind))
+	return paramList
+}
+
+func (p *Parser) anonymousFunction(kind string) Expr {
+	paren := p.consume(Tokens.LEFT_PAREN, fmt.Sprintf("Expect '(' after fun"))
+	params := p.paramList(paren, "function")
 	p.consume(Tokens.LEFT_BRACE, fmt.Sprintf("Expect '{' before %s body", kind))
 	stmts := p.block()
-	return &Ast.Function{Name: name, Params: paramList, Body: stmts}
+	return &Ast.AnonymousFuncion{Params: params, Body: stmts}
+}
+
+func (p *Parser) namedFunction(name *Token, kind string) Stmt {
+	paren := p.consume(Tokens.LEFT_PAREN, fmt.Sprintf("Expect '(' after %s name", kind))
+	params := p.paramList(paren, "function")
+	p.consume(Tokens.LEFT_BRACE, fmt.Sprintf("Expect '{' before %s body", kind))
+	stmts := p.block()
+	return &Ast.NamedFunction{Name: name, Params: params, Body: stmts}
 }
 
 func (p *Parser) params() []*Tokens.Token {
@@ -99,10 +119,10 @@ func (p *Parser) varDecl() Stmt {
 	if p.match(Tokens.EQUAL) {
 		expr := p.expression()
 		p.consume(Tokens.SEMICOLON, "Expect ';' after declaration")
-		return Ast.VarStmt{Name: varName, Initializer: expr}
+		return &Ast.VarStmt{Name: varName, Initializer: expr}
 	}
 	p.consume(Tokens.SEMICOLON, "Expect ';' after declaration")
-	return Ast.VarStmt{Name: varName, Initializer: nil}
+	return &Ast.VarStmt{Name: varName, Initializer: nil}
 }
 
 func (p *Parser) statement() Stmt {
@@ -110,7 +130,7 @@ func (p *Parser) statement() Stmt {
 	case p.match(Tokens.PRINT):
 		return p.print()
 	case p.match(Tokens.LEFT_BRACE):
-		return Ast.BlockStmt{Statements: p.block()}
+		return &Ast.BlockStmt{Statements: p.block()}
 	case p.match(Tokens.IF):
 		return p.ifStmt()
 	case p.match(Tokens.WHILE):
@@ -127,7 +147,7 @@ func (p *Parser) statement() Stmt {
 func (p *Parser) ReturnStmt() Stmt {
 	keyword := p.previous()
 	if p.match(Tokens.SEMICOLON) {
-		return Ast.Return{Keyword: keyword, Value: nil}
+		return &Ast.Return{Keyword: keyword, Value: nil}
 	}
 	expr := p.expression()
 	p.consume(Tokens.SEMICOLON, "Expect ';' after return.")
@@ -157,19 +177,19 @@ func (p *Parser) ForStmt() Stmt {
 		increment = p.expression()
 	}
 	p.consume(Tokens.RIGHT_PAREN, "Expect ')' after for clauses")
-	incrementStmt := Ast.ExpressionStmt{Expression: increment}
+	incrementStmt := &Ast.ExpressionStmt{Expression: increment}
 
 	body := p.statement()
 
 	if increment != nil {
-		body = Ast.BlockStmt{Statements: []Stmt{body, incrementStmt}}
+		body = &Ast.BlockStmt{Statements: []Stmt{body, incrementStmt}}
 	}
 	if condition == nil {
-		condition = Ast.LiteralExpr{Value: true}
+		condition = &Ast.LiteralExpr{Value: true}
 	}
 	body = &Ast.WhileStmt{Condition: condition, Body: body}
 	if initializer != nil {
-		body = Ast.BlockStmt{Statements: []Stmt{initializer, body}}
+		body = &Ast.BlockStmt{Statements: []Stmt{initializer, body}}
 	}
 	return body
 }
@@ -192,13 +212,13 @@ func (p *Parser) ifStmt() Stmt {
 	if p.match(Tokens.ELSE) {
 		elseBranch = p.statement()
 	}
-	return Ast.IfStmt{Condition: condition, ThenBranch: thenBranch, ElseBranch: elseBranch}
+	return &Ast.IfStmt{Condition: condition, ThenBranch: thenBranch, ElseBranch: elseBranch}
 }
 
 func (p *Parser) print() Stmt {
 	expr := p.expression()
 	p.consume(Tokens.SEMICOLON, "Expect ';' after expression")
-	return Ast.PrintStmt{Expression: expr}
+	return &Ast.PrintStmt{Expression: expr}
 }
 
 func (p *Parser) block() []Stmt {
@@ -213,7 +233,7 @@ func (p *Parser) block() []Stmt {
 func (p *Parser) expressionStmt() Stmt {
 	expr := p.expression()
 	p.consume(Tokens.SEMICOLON, "Expect ';' after expression")
-	return Ast.ExpressionStmt{Expression: expr}
+	return &Ast.ExpressionStmt{Expression: expr}
 }
 
 func (p *Parser) expression() Expr {
@@ -222,7 +242,7 @@ func (p *Parser) expression() Expr {
 
 // assignment -> IDENTIFIER "=" assignment | equality
 func (p *Parser) assignment() Expr {
-	expr := p.logic_or()
+	expr := p.funcExpr()
 	if p.match(Tokens.EQUAL) {
 		equals := p.previous()
 		value := p.assignment()
@@ -232,6 +252,17 @@ func (p *Parser) assignment() Expr {
 		Error.ReportParseError(equals, "Invalid assignment target")
 	}
 	return expr
+}
+
+func (p *Parser) funcExpr() Expr {
+	if p.match(Tokens.FUN) {
+		paren := p.consume(Tokens.LEFT_PAREN, "Expect '(' after fun")
+		params := p.paramList(paren, "function")
+		p.consume(Tokens.LEFT_BRACE, fmt.Sprintf("Expect '{' before %s body", "function"))
+		stmts := p.block()
+		return &Ast.AnonymousFuncion{Params: params, Body: stmts}
+	}
+	return p.logic_or()
 }
 
 func (p *Parser) logic_or() Expr {
@@ -437,7 +468,7 @@ func (p *Parser) synchronize() {
 	}
 }
 
-// Similar to `check()`, but accepts a list of token types
+// Similar to `check()`, but accepts a list of token types and consumes
 func (p *Parser) match(tokenTypes ...string) bool {
 	for _, tokenType := range tokenTypes {
 		if p.check(tokenType) {
@@ -471,7 +502,7 @@ func (p *Parser) consume(tokenType string, message string) *Tokens.Token {
 	return nil
 }
 
-// checks the type of the current token, consumes the token if types match
+// checks the type of the current token, does not consume
 func (p *Parser) check(tokenType string) bool {
 	if p.isAtEnd() {
 		return false

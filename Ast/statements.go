@@ -46,13 +46,13 @@ type WhileStmt struct {
 
 func (while WhileStmt) stmt() {}
 
-type Function struct {
+type NamedFunction struct {
 	Name   *Tokens.Token
 	Params []*Tokens.Token
 	Body   []Stmt
 }
 
-func (f Function) stmt() {}
+func (f NamedFunction) stmt() {}
 
 type Return struct {
 	Keyword *Tokens.Token

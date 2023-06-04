@@ -32,20 +32,20 @@ func (i *Interpreter) Interpret(stmts []Parser.Stmt) error {
 
 func (i *Interpreter) Exec(stmt Parser.Stmt) error {
 	switch s := stmt.(type) {
-	case Ast.ExpressionStmt:
-		return i.ExecExpressionStmt(&s)
-	case Ast.PrintStmt:
-		return i.ExecPrintStmt(&s)
-	case Ast.VarStmt:
-		return i.ExecVarStmt(&s)
-	case Ast.BlockStmt:
-		return i.ExecBlockStmt(&s)
-	case Ast.IfStmt:
-		return i.ExecIfStmt(&s)
+	case *Ast.ExpressionStmt:
+		return i.ExecExpressionStmt(s)
+	case *Ast.PrintStmt:
+		return i.ExecPrintStmt(s)
+	case *Ast.VarStmt:
+		return i.ExecVarStmt(s)
+	case *Ast.BlockStmt:
+		return i.ExecBlockStmt(s)
+	case *Ast.IfStmt:
+		return i.ExecIfStmt(s)
 	case *Ast.WhileStmt:
 		return i.ExecWhileStmt(s)
-	case *Ast.Function:
-		return i.ExecFuncStmt(s)
+	case *Ast.NamedFunction:
+		return i.ExecNamedFuncStmt(s)
 	case *Ast.Return:
 		return i.ExecReturnStmt(s)
 	}
@@ -65,8 +65,8 @@ func (i *Interpreter) ExecReturnStmt(stmt *Ast.Return) error {
 	return err
 }
 
-func (i *Interpreter) ExecFuncStmt(stmt *Ast.Function) error {
-	callable := CreateFunction(stmt, i.Env)
+func (i *Interpreter) ExecNamedFuncStmt(stmt *Ast.NamedFunction) error {
+	callable := CreateFunctionCallable(stmt.Body, stmt.Params, i.Env)
 	i.Env.Define(stmt.Name.Lexeme, callable)
 	return nil
 }
@@ -166,10 +166,17 @@ func (i *Interpreter) Eval(expr Parser.Expr) (any, error) {
 		return i.EvalAssign(e)
 	case *Ast.LogicalExpr:
 		return i.EvalLogical(e)
+	case *Ast.AnonymousFuncion:
+		return i.EvalAnonymousFunction(e)
 	case *Ast.Call:
 		return i.EvalCall(e)
 	}
 	return nil, Error.ErrRuntimeError
+}
+
+func (i *Interpreter) EvalAnonymousFunction(expr *Ast.AnonymousFuncion) (any, error) {
+	callable := CreateFunctionCallable(expr.Body, expr.Params, i.Env)
+	return callable, nil
 }
 
 func (i *Interpreter) EvalCall(expr *Ast.Call) (any, error) {
@@ -448,5 +455,4 @@ func isTruthy(val any) bool {
 		return boolVal
 	}
 	return true
-
 }

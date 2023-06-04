@@ -73,3 +73,10 @@ type Call struct {
 }
 
 func (c *Call) isExpr() {}
+
+type AnonymousFuncion struct {
+	Params []*Tokens.Token
+	Body   []Stmt
+}
+
+func (f AnonymousFuncion) isExpr() {}
