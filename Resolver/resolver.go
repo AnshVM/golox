@@ -74,7 +74,6 @@ func (r *Resolver) Resolve(node any) {
 				Error.ReportParseError(n.Name, "Can't read local variable in its own initializer.")
 			}
 		}
-		scope[n.Name.Lexeme] = USED
 		r.resolveLocal(n, n.Name)
 		break
 	case *Ast.AssignExpr:
@@ -178,6 +177,7 @@ func (r *Resolver) resolveLocal(expr Ast.Expr, name *Tokens.Token) {
 	for i := r.scopes.Size() - 1; i >= 0; i-- {
 		scope, _ := r.scopes.Get(i)
 		if _, ok := scope[name.Lexeme]; ok {
+			scope[name.Lexeme] = USED
 			r.interpreter.Resolve(expr, r.scopes.Size()-1-i)
 			return
 		}
