@@ -22,6 +22,9 @@ func run(i *Interpreter.Interpreter, source string) {
 	parser := Parser.NewParser(tokens)
 	stmts := parser.Parse()
 	resolver := Resolver.NewResolver(i)
+	if Error.HadError {
+		return
+	}
 	resolver.Resolve(stmts)
 	if Error.HadError {
 		return

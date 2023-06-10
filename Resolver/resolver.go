@@ -8,13 +8,23 @@ import (
 	"github.com/AnshVM/golox/Utils"
 )
 
+const (
+	FUNCTION = iota
+	NONE     = iota
+)
+
 type Resolver struct {
-	interpreter *Interpreter.Interpreter
-	scopes      Utils.Stack[map[string]bool]
+	interpreter     *Interpreter.Interpreter
+	scopes          Utils.Stack[map[string]bool]
+	currentFunction int
 }
 
 func NewResolver(interpreter *Interpreter.Interpreter) *Resolver {
-	return &Resolver{interpreter: interpreter, scopes: Utils.NewStack[map[string]bool]()}
+	return &Resolver{
+		interpreter:     interpreter,
+		scopes:          Utils.NewStack[map[string]bool](),
+		currentFunction: NONE,
+	}
 }
 
 func (r *Resolver) Resolve(node any) {
@@ -58,6 +68,8 @@ func (r *Resolver) Resolve(node any) {
 		break
 
 	case *Ast.AnonymousFuncion:
+		enclosingFunction := r.currentFunction
+		r.currentFunction = FUNCTION
 		r.beginScope()
 		for _, arg := range n.Params {
 			r.declare(arg)
@@ -65,6 +77,8 @@ func (r *Resolver) Resolve(node any) {
 		}
 		r.Resolve(n.Body)
 		r.endScope()
+		r.currentFunction = enclosingFunction
+		break
 
 	case *Ast.ExpressionStmt:
 		r.Resolve(n.Expression)
@@ -83,6 +97,9 @@ func (r *Resolver) Resolve(node any) {
 		break
 
 	case *Ast.Return:
+		if r.currentFunction == NONE {
+			Error.ReportParseError(n.Keyword, "Cannot return from top-level code.")
+		}
 		r.Resolve(n.Value)
 		break
 
@@ -124,6 +141,8 @@ func (r *Resolver) Resolve(node any) {
 }
 
 func (r *Resolver) resolveFunction(stmt *Ast.NamedFunction) {
+	enclosingFunction := r.currentFunction
+	r.currentFunction = FUNCTION
 	r.beginScope()
 	for _, arg := range stmt.Params {
 		r.declare(arg)
@@ -131,6 +150,7 @@ func (r *Resolver) resolveFunction(stmt *Ast.NamedFunction) {
 	}
 	r.Resolve(stmt.Body)
 	r.endScope()
+	r.currentFunction = enclosingFunction
 }
 
 func (r *Resolver) resolveLocal(expr Ast.Expr, name *Tokens.Token) {
