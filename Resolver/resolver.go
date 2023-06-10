@@ -1,6 +1,8 @@
 package Resolver
 
 import (
+	"fmt"
+
 	"github.com/AnshVM/golox/Ast"
 	"github.com/AnshVM/golox/Error"
 	"github.com/AnshVM/golox/Interpreter"
@@ -13,16 +15,34 @@ const (
 	NONE     = iota
 )
 
+const (
+	DECLARED = iota
+	DEFINED  = iota
+	USED     = iota
+)
+
+func isDeclared(status int) bool {
+	return status == DECLARED || status == DEFINED || status == USED
+}
+
+func isDefined(status int) bool {
+	return status == DEFINED || status == USED
+}
+
+func isUsed(status int) bool {
+	return status == USED
+}
+
 type Resolver struct {
 	interpreter     *Interpreter.Interpreter
-	scopes          Utils.Stack[map[string]bool]
+	scopes          Utils.Stack[map[string]int]
 	currentFunction int
 }
 
 func NewResolver(interpreter *Interpreter.Interpreter) *Resolver {
 	return &Resolver{
 		interpreter:     interpreter,
-		scopes:          Utils.NewStack[map[string]bool](),
+		scopes:          Utils.NewStack[map[string]int](),
 		currentFunction: NONE,
 	}
 }
@@ -50,10 +70,11 @@ func (r *Resolver) Resolve(node any) {
 	case *Ast.VariableExpr:
 		scope, err := r.scopes.Peek()
 		if err == nil {
-			if declared, ok := scope[n.Name.Lexeme]; ok && !declared {
+			if status, ok := scope[n.Name.Lexeme]; ok && status == DECLARED {
 				Error.ReportParseError(n.Name, "Can't read local variable in its own initializer.")
 			}
 		}
+		scope[n.Name.Lexeme] = USED
 		r.resolveLocal(n, n.Name)
 		break
 	case *Ast.AssignExpr:
@@ -171,7 +192,7 @@ func (r *Resolver) declare(name *Tokens.Token) {
 	if err != nil {
 		return
 	}
-	scope[name.Lexeme] = false
+	scope[name.Lexeme] = DECLARED
 }
 
 func (r *Resolver) define(name *Tokens.Token) {
@@ -179,13 +200,19 @@ func (r *Resolver) define(name *Tokens.Token) {
 	if err != nil {
 		return
 	}
-	scope[name.Lexeme] = true
+	scope[name.Lexeme] = DEFINED
 }
 
 func (r *Resolver) beginScope() {
-	r.scopes.Push(map[string]bool{})
+	r.scopes.Push(map[string]int{})
 }
 
 func (r *Resolver) endScope() {
+	scope, _ := r.scopes.Peek()
+	for varName, status := range scope {
+		if !isUsed(status) {
+			Error.ReportResolverError(fmt.Sprintf("Variable '%s' was declared but never used", varName))
+		}
+	}
 	r.scopes.Pop()
 }

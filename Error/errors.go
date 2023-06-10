@@ -34,3 +34,8 @@ func ReportRuntimeError(token *Tokens.Token, message string) {
 	PrintError(token.Line, fmt.Sprintf("at '%s'", token.Lexeme), message)
 	HadRuntimeError = true
 }
+
+func ReportResolverError(message string) {
+	fmt.Println(message)
+	HadError = true
+}
