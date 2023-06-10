@@ -3,6 +3,7 @@ package Ast
 import "github.com/AnshVM/golox/Tokens"
 
 type Stmt interface {
+	Node
 	stmt()
 }
 

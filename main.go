@@ -11,6 +11,7 @@ import (
 	"github.com/AnshVM/golox/Error"
 	"github.com/AnshVM/golox/Interpreter"
 	"github.com/AnshVM/golox/Parser"
+	"github.com/AnshVM/golox/Resolver"
 	"github.com/AnshVM/golox/Scanner"
 )
 
@@ -20,7 +21,9 @@ func run(i *Interpreter.Interpreter, source string) {
 
 	parser := Parser.NewParser(tokens)
 	stmts := parser.Parse()
-	if Error.HadError || Error.HadRuntimeError {
+	resolver := Resolver.NewResolver(i)
+	resolver.Resolve(stmts)
+	if Error.HadError {
 		return
 	}
 	i.Interpret(stmts)

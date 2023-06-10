@@ -13,11 +13,17 @@ import (
 type Interpreter struct {
 	Env         *Environment.Environment
 	ReturnValue any //ugly hack to catch the return value in the Call, evaluated in the ExecReturnStmt func
+	locals      map[Ast.Expr]int
+	globals     *Environment.Environment
 }
 
 func NewInterpreter(env *Environment.Environment) *Interpreter {
 	env.Define("clock", Clock())
-	return &Interpreter{Env: env}
+	return &Interpreter{globals: env, Env: env, locals: map[Ast.Expr]int{}}
+}
+
+func (i *Interpreter) Resolve(expr Ast.Expr, depth int) {
+	i.locals[expr] = depth
 }
 
 func (i *Interpreter) Interpret(stmts []Parser.Stmt) error {
@@ -230,11 +236,12 @@ func (i *Interpreter) EvalAssign(expr *Ast.AssignExpr) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = i.Env.Assign(expr.Name, value)
-	if err != nil {
-		return nil, err
+
+	if distance, ok := i.locals[expr]; ok {
+		return value, i.Env.AssignAt(distance, expr.Name, value)
+	} else {
+		return value, i.globals.Assign(expr.Name, value)
 	}
-	return value, nil
 }
 
 func (i *Interpreter) EvalLiteral(expr *Ast.LiteralExpr) any {
@@ -270,7 +277,15 @@ func (i *Interpreter) EvalUnary(expr *Ast.UnaryExpr) (any, error) {
 }
 
 func (i *Interpreter) EvalVariable(expr *Ast.VariableExpr) (any, error) {
-	return i.Env.Get(expr.Name)
+	return i.lookupVariable(expr.Name, expr)
+}
+
+func (i *Interpreter) lookupVariable(name *Tokens.Token, expr Ast.Expr) (any, error) {
+	if depth, ok := i.locals[expr]; ok {
+		return i.Env.GetAt(depth, name)
+	} else {
+		return i.globals.Get(name)
+	}
 }
 
 func (i *Interpreter) EvalConditional(conditional *Ast.ConditionalExpr) (any, error) {

@@ -7,6 +7,7 @@ import (
 type Token = Tokens.Token
 
 type Expr interface {
+	Node
 	isExpr()
 }
 

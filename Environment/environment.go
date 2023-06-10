@@ -38,3 +38,19 @@ func (env *Environment) Assign(name *Tokens.Token, value any) error {
 	}
 	return nil
 }
+
+func (env *Environment) AssignAt(distance int, name *Tokens.Token, value any) error {
+	return env.ancestor(distance).Assign(name, value)
+}
+
+func (env *Environment) GetAt(distance int, name *Tokens.Token) (any, error) {
+	return env.ancestor(distance).Get(name)
+}
+
+func (env *Environment) ancestor(distance int) *Environment {
+	curr := env
+	for i := 0; i < distance; i++ {
+		curr = env.Enclosing
+	}
+	return curr
+}
